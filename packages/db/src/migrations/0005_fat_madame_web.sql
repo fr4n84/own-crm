@@ -1,0 +1,1 @@
+ALTER TABLE "leads" ADD COLUMN "questions" json DEFAULT '[]'::json NOT NULL;

@@ -1,0 +1,68 @@
+.theme,
+.overlayTheme {
+  color: var(--foreground);
+}
+
+:global(html:not(.dark)) .theme,
+:global(html:not(.dark)) .overlayTheme {
+  --primary: #3139fb;
+  --primary-foreground: #ffffff;
+  --card: #fffcec;
+  --card-foreground: #3139fb;
+  --accent: #fffadd;
+  --accent-foreground: #3139fb;
+  --border: #3139fb;
+  --input: #3139fb;
+  --ring: #3139fb;
+
+  color: var(--card-foreground);
+}
+
+.theme {
+  font-family:
+    InterVariable, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Oxygen, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+}
+
+.heading {
+  font-family: "Exposure VAR", Helvetica, sans-serif;
+  font-size: clamp(2rem, 4vw, 2.5rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.72px;
+}
+
+.subtitle {
+  max-width: 42rem;
+  line-height: 1.5;
+}
+
+.theme :global([data-slot="card"]) {
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 1px var(--border),
+    rgb(0 0 0 / 10%) 0 5px 5px;
+}
+
+.theme :global([data-slot="card-title"]) {
+  font-family: "Exposure VAR", Helvetica, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+.theme :global([data-slot="select-trigger"]),
+.theme :global([data-slot="button"]),
+.overlayTheme {
+  border-radius: 8px;
+}
+
+.theme :global([data-slot="table-header"]) {
+  background: var(--accent);
+}
+
+.theme :global([data-slot="table-container"]) {
+  border-radius: 10px;
+}

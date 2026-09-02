@@ -1,0 +1,36 @@
+{
+  "name": "@crm-fran/db",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest run",
+    "db:push": "drizzle-kit push",
+    "db:seed": "tsx scripts/seed.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:studio": "drizzle-kit studio",
+    "db:migrate": "drizzle-kit migrate"
+  },
+  "dependencies": {
+    "@crm-fran/env": "workspace:*",
+    "csv-parse": "^7.0.2",
+    "dotenv": "catalog:",
+    "drizzle-orm": "^0.45.1",
+    "pg": "^8.17.1",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@crm-fran/config": "workspace:*",
+    "@faker-js/faker": "^10.5.0",
+    "@types/pg": "^8.16.0",
+    "drizzle-kit": "^0.31.8",
+    "tsx": "^4.23.0",
+    "typescript": "catalog:"
+  }
+}

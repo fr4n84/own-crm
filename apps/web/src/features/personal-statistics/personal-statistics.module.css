@@ -1,0 +1,95 @@
+.theme,
+.overlayTheme {
+  color: var(--foreground);
+}
+
+:global(html:not(.dark)) .theme,
+:global(html:not(.dark)) .overlayTheme {
+  --primary: #3139fb;
+  --primary-foreground: #ffffff;
+  --card: #fffcec;
+  --card-foreground: #3139fb;
+  --accent: #fffadd;
+  --accent-foreground: #3139fb;
+  --border: #3139fb;
+  --input: #3139fb;
+  --ring: #3139fb;
+  --chart-1: #3139fb;
+  --chart-2: #6847d9;
+  --chart-3: #00758f;
+  --chart-4: #c65d00;
+  --chart-5: #b51f68;
+  --chart-6: #16803c;
+  --chart-7: #b42318;
+  --chart-8: #4338ca;
+  --chart-9: #0f766e;
+
+  color: var(--card-foreground);
+}
+
+.theme {
+  --chart-6: #22c55e;
+  --chart-7: #ef4444;
+  --chart-8: #818cf8;
+  --chart-9: #2dd4bf;
+
+  font-family:
+    InterVariable, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Oxygen, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+}
+
+.heading {
+  font-family: "Exposure VAR", Helvetica, sans-serif;
+  font-size: clamp(2rem, 4vw, 2.5rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.72px;
+}
+
+.subtitle {
+  max-width: 42rem;
+  line-height: 1.5;
+}
+
+.theme :global([data-slot="card"]) {
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 1px var(--border),
+    rgb(0 0 0 / 10%) 0 5px 5px;
+  transition:
+    box-shadow 150ms ease-out,
+    transform 150ms ease-out;
+}
+
+.theme :global([data-slot="card-title"]) {
+  font-family: "Exposure VAR", Helvetica, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+.theme :global([data-slot="chart"]) {
+  font-family:
+    "ABC Favorit Mono", Menlo, Monaco, "Lucida Console", "Courier New",
+    monospace;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+}
+
+.metricValue {
+  font-family:
+    "Marlin Soft SQ", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Oxygen, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+  font-size: clamp(2.25rem, 5vw, 2.75rem);
+  font-weight: 700;
+  line-height: 0.98;
+  letter-spacing: -1.6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme :global([data-slot="card"]) {
+    transition-duration: 50ms;
+  }
+}

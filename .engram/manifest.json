@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "chunks": [
+    {
+      "id": "4f088838",
+      "created_by": "francisco",
+      "created_at": "2026-06-28T17:09:59Z",
+      "sessions": 17,
+      "memories": 13,
+      "prompts": 21
+    },
+    {
+      "id": "931e1549",
+      "created_by": "francisco",
+      "created_at": "2026-07-13T17:43:19Z",
+      "sessions": 20,
+      "memories": 23,
+      "prompts": 98
+    }
+  ]
+}

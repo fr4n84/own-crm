@@ -1,0 +1,24 @@
+{
+  "name": "@crm-fran/auth",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@crm-fran/db": "workspace:*",
+    "@crm-fran/env": "workspace:*",
+    "better-auth": "catalog:",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@crm-fran/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

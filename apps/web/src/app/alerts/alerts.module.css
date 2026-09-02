@@ -1,0 +1,26 @@
+.theme,
+.overlayTheme {
+  color: var(--foreground);
+}
+
+:global(html:not(.dark)) .theme,
+:global(html:not(.dark)) .overlayTheme {
+  --primary: #3139fb;
+  --primary-foreground: #ffffff;
+  --card: #fffcec;
+  --card-foreground: #3139fb;
+  --accent: #fffadd;
+  --accent-foreground: #3139fb;
+  --border: #3139fb;
+  --input: #3139fb;
+  --ring: #3139fb;
+
+  color: var(--card-foreground);
+}
+
+.theme :global([data-slot="card"]) {
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 1px var(--border),
+    rgb(0 0 0 / 10%) 0 5px 5px;
+}

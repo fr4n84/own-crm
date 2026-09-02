@@ -1,0 +1,30 @@
+{
+  "name": "@crm-fran/api",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@crm-fran/auth": "workspace:*",
+    "@crm-fran/db": "workspace:*",
+    "@crm-fran/env": "workspace:*",
+    "@trpc/client": "catalog:",
+    "@trpc/server": "catalog:",
+    "dotenv": "catalog:",
+    "next": "catalog:",
+    "openai": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@crm-fran/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

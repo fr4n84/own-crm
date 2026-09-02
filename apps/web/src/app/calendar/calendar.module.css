@@ -1,0 +1,141 @@
+.theme {
+  color: var(--foreground);
+  font-family:
+    InterVariable, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Oxygen, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+}
+
+:global(html:not(.dark)) .theme {
+  --primary: #3139fb;
+  --primary-foreground: #ffffff;
+  --card: #fffcec;
+  --card-foreground: #3139fb;
+  --accent: #fffadd;
+  --accent-foreground: #3139fb;
+  --border: #3139fb;
+  --input: #3139fb;
+  --ring: #3139fb;
+  color: var(--card-foreground);
+}
+
+.heading {
+  font-family: "Exposure VAR", Helvetica, sans-serif;
+  font-size: clamp(2rem, 4vw, 2.5rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.72px;
+}
+
+.subtitle {
+  max-width: 42rem;
+  line-height: 1.5;
+}
+
+.theme :global([data-slot="card"]) {
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 1px var(--border),
+    rgb(0 0 0 / 10%) 0 5px 5px;
+}
+
+.theme :global([data-slot="card-title"]) {
+  font-family: "Exposure VAR", Helvetica, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+.theme :global([data-slot="button"]) {
+  border-radius: 8px;
+}
+
+.calendarGrid {
+  display: grid;
+  border-top: 1px solid color-mix(in srgb, var(--border) 30%, transparent);
+}
+
+.cornerCell,
+.dayHeader,
+.hourCell,
+.timeSlot {
+  border-right: 1px solid color-mix(in srgb, var(--border) 30%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 30%, transparent);
+}
+
+.cornerCell,
+.dayHeader {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--card);
+}
+
+.cornerCell,
+.hourCell {
+  padding: 0.75rem;
+  text-align: right;
+}
+
+.dayHeader {
+  display: flex;
+  min-height: 4.25rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.5rem 1rem;
+}
+
+.weekday {
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.dayNumber,
+.todayNumber {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 999px;
+  font-family: "Exposure VAR", Helvetica, sans-serif;
+  font-size: 1rem;
+}
+
+.todayNumber {
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+
+.hourCell {
+  background: var(--card);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.625rem;
+  opacity: 0.7;
+}
+
+.timeSlot {
+  display: flex;
+  min-height: 2.75rem;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 0.375rem;
+}
+
+.timeSlot :global([data-slot="button"]) {
+  min-height: 2.75rem;
+  height: auto;
+  width: 100%;
+  min-width: 0;
+  justify-content: flex-start;
+  white-space: normal;
+  overflow: hidden;
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+  font-size: 0.6875rem;
+  box-shadow: none;
+}

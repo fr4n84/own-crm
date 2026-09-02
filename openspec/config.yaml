@@ -1,0 +1,153 @@
+# =============================================================================
+# OpenSpec SDD Configuration — crm-fran
+# Auto-generated: 2026-06-14
+# =============================================================================
+# This file manages the SDD lifecycle for the crm-fran monorepo.
+# It is maintained collaboratively: the SDD init executor generates it,
+# and developers may tune phase rules, test commands, and review budgets.
+# =============================================================================
+
+project:
+  name: crm-fran
+  type: monorepo
+  stack: Better-T-Stack v3.32.0
+  package_manager: pnpm@11.6.0
+  monorepo_tool: turborepo
+  frontend:
+    path: apps/web
+    framework: next
+    version: ^16.2.0
+    port: 3001
+  backend:
+    type: self-hosted
+    path: packages/api
+    protocol: tRPC
+    framework:
+      name: "@trpc/server"
+      version: ^11.16.0
+  database:
+    engine: postgresql
+    orm: drizzle-orm ^0.45.1
+    path: packages/db
+    migration_tool: drizzle-kit ^0.31.8
+  auth:
+    provider: better-auth
+    version: 1.6.11
+    path: packages/auth
+  ui:
+    path: packages/ui
+    library: shadcn/ui (custom)
+    styling: tailwindcss ^4.1.18
+  shared_config:
+    path: packages/config
+    tsconfig_base: packages/config/tsconfig.base.json
+  env_config:
+    path: packages/env
+    framework:
+      - "@t3-oss/env-core"
+      - "@t3-oss/env-nextjs"
+  typescript:
+    version: ^6 (catalog)
+    strict: true
+    module: ESNext
+    moduleResolution: bundler
+    verbatimModuleSyntax: true
+    noUncheckedIndexedAccess: true
+    noUnusedLocals: true
+    noUnusedParameters: true
+
+# ── Strict TDD Configuration ────────────────────────────────────────────────
+strict_tdd:
+  enabled: true
+  mode: strict # strict | loose | off
+  test_runner: vitest
+  test_runner_version: ^4.0.0
+  test_file_patterns:
+    - "**/*.test.ts"
+    - "**/*.test.tsx"
+    - "**/*.spec.ts"
+    - "**/*.spec.tsx"
+  test_scripts:
+    unit: turbo test --continue
+    run_single: pnpm vitest run --project "$PROJECT" --passWithNoTests
+    watch: pnpm vitest --passWithNoTests
+  expect_coverage: false
+  coverage_threshold: 80
+  packages_requiring_tests:
+    - packages/api
+    - packages/auth
+    - packages/db
+    - packages/ui
+    - packages/tests
+    - apps/web
+
+# ── SDD Phase Rules ─────────────────────────────────────────────────────────
+sdd:
+  enabled: true
+  mode: interactive # interactive | auto
+  interactive:
+    pause_between_phases: true
+    approval_required: immediate_next
+    proposal_question_rounds: true
+  phases:
+    - id: sdd-proposal
+      description: "PRD/Proposal — scope, user stories, business rules"
+      required_artifacts:
+        - openspec/<change>/proposal.md
+      test_command: null
+    - id: sdd-spec
+      description: "Specification — data models, API contracts"
+      required_artifacts:
+        - openspec/<change>/spec.md
+      test_command: null
+    - id: sdd-design
+      description: "Design — file-by-file implementation plan"
+      required_artifacts:
+        - openspec/<change>/design.md
+      test_command: null
+    - id: sdd-tasks
+      description: "Tasks — granular work items with estimates"
+      required_artifacts:
+        - openspec/<change>/tasks.md
+      test_command: null
+    - id: sdd-apply
+      description: "Implementation — code + tests (Red-Green-Refactor)"
+      required_artifacts:
+        - openspec/<change>/apply-progress.md
+      test_command: turbo test --continue
+    - id: sdd-verify
+      description: "Verification — tests, types, lint, build"
+      required_artifacts:
+        - openspec/<change>/verify-report.md
+      test_command: pnpm check-types && turbo test --continue
+    - id: sdd-chore
+      description: "Chore — CI config, deps, documentation"
+      required_artifacts:
+        - openspec/<change>/apply-progress.md
+      test_command: null
+
+# ── Chained PR Strategy ─────────────────────────────────────────────────────
+pr_strategy:
+  mode: ask-always
+  split_threshold_lines: 400
+  review_budget: 400
+
+# ── Memory & Artifact Store ─────────────────────────────────────────────────
+artifact_store:
+  primary: openspec
+  hybrid_memory: true
+  engram_topic_keys:
+    init: sdd/init/config
+    proposal: sdd/<change>/proposal
+    spec: sdd/<change>/spec
+    design: sdd/<change>/design
+    tasks: sdd/<change>/tasks
+    apply: sdd/<change>/apply-progress
+    verify: sdd/<change>/verify-report
+
+# ── Test Runner Status ──────────────────────────────────────────────────────
+# Vitest is installed and configured across all packages.
+# - vitest.workspace.ts at root (apps/*, packages/*)
+# - Each package has vitest.config.ts + "test": "vitest run"
+# - turbo.json has "test" task
+# - Run: turbo test  (all packages),  pnpm vitest run --project <name>  (single)
