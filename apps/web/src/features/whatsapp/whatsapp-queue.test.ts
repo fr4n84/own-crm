@@ -17,4 +17,11 @@ describe("WhatsApp queue", () => {
     expect(source).not.toContain("plantilla");
     expect(source).not.toContain("mensaje");
   });
+  it("keeps a visible, accessible confirmation before removing a sent row", () => {
+    expect(source).toContain('aria-live="polite"');
+    expect(source).toContain("optimisticSent");
+    expect(source).toContain("setTimeout");
+    expect(source).toContain("onMutate");
+    expect(source).toContain("onError");
+  });
 });

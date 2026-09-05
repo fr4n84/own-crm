@@ -68,19 +68,33 @@ export const alertPreferencesInput = z
 		relevanceMode: z.nativeEnum(ALERT_RELEVANCE_MODE),
 		urgentThresholdHours: z.number().int().min(0).max(720),
 		warningThresholdHours: z.number().int().min(1).max(720),
+		noContactUrgentThresholdHours: z.number().int().min(0).max(720).optional(),
+		noContactWarningThresholdHours: z.number().int().min(1).max(720).optional(),
+		followUpUrgentThresholdHours: z.number().int().min(0).max(720).optional(),
+		followUpWarningThresholdHours: z.number().int().min(1).max(720).optional(),
+		futureCallUrgentThresholdHours: z.number().int().min(0).max(720).optional(),
+		futureCallWarningThresholdHours: z.number().int().min(1).max(720).optional(),
+		appointmentUrgentThresholdHours: z.number().int().min(0).max(720).optional(),
+		appointmentWarningThresholdHours: z.number().int().min(1).max(720).optional(),
+		rescheduledUrgentThresholdHours: z.number().int().min(0).max(720).optional(),
+		rescheduledWarningThresholdHours: z.number().int().min(1).max(720).optional(),
 		noContactSeverity: z.nativeEnum(ALERT_SEVERITY),
 		followUpSeverity: z.nativeEnum(ALERT_SEVERITY),
 		futureCallSeverity: z.nativeEnum(ALERT_SEVERITY),
 		appointmentSeverity: z.nativeEnum(ALERT_SEVERITY),
 		rescheduledSeverity: z.nativeEnum(ALERT_SEVERITY),
 	})
-	.refine(
-		(value) => value.warningThresholdHours > value.urgentThresholdHours,
-		{
-			message: "Warning threshold must be greater than urgent threshold",
-			path: ["warningThresholdHours"],
-		},
-	);
+	.superRefine((value, context) => {
+		const pairs = [
+			["warningThresholdHours", value.urgentThresholdHours, value.warningThresholdHours],
+			["noContactWarningThresholdHours", value.noContactUrgentThresholdHours, value.noContactWarningThresholdHours],
+			["followUpWarningThresholdHours", value.followUpUrgentThresholdHours, value.followUpWarningThresholdHours],
+			["futureCallWarningThresholdHours", value.futureCallUrgentThresholdHours, value.futureCallWarningThresholdHours],
+			["appointmentWarningThresholdHours", value.appointmentUrgentThresholdHours, value.appointmentWarningThresholdHours],
+			["rescheduledWarningThresholdHours", value.rescheduledUrgentThresholdHours, value.rescheduledWarningThresholdHours],
+		] as const;
+		for (const [path, urgent, warning] of pairs) if (urgent !== undefined && warning !== undefined && warning <= urgent) context.addIssue({ code: "custom", path: [path], message: "Warning threshold must be greater than urgent threshold" });
+	});
 
 export const alertsRouter = router({
 	getPreferences: protectedProcedure.query(async ({ ctx }) => {

@@ -66,7 +66,7 @@ export function NavMain({
                   onClick={() => {
                     if (isMobile) setOpenMobile(false)
                   }}
-                  className={isActive ? "bg-blue-100 text-blue-700 font-bold" : ""}
+                  className={isActive ? "bg-sidebar-accent text-sidebar-accent-foreground text-sm font-bold" : "text-sm"}
                 >
                   {item.icon}
                   <span>{item.title}</span>

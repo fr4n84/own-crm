@@ -30,12 +30,12 @@ import {
 } from "@crm-fran/ui/components/select";
 
 import type {
-  AlertRelevanceSeverity,
   AlertRelevanceMode,
   AlertRelevancePreferences,
   ConfigurableAlertKind,
 } from "./alert-relevance";
 import { useUpdateAlertPreferences } from "./use-alerts";
+import { getAlertSeverityLabel } from "./alert-labels";
 
 const CONDITION_OPTIONS: Array<{
   kind: ConfigurableAlertKind;
@@ -47,12 +47,6 @@ const CONDITION_OPTIONS: Array<{
   { kind: "appointment", label: "Agenda" },
   { kind: "rescheduled", label: "Reagenda" },
 ];
-
-const SEVERITY_LABELS: Record<AlertRelevanceSeverity, string> = {
-  urgent: "Alta",
-  warning: "Media",
-  info: "Baja",
-};
 
 export function AlertPreferencesDialog({
   preferences,
@@ -70,6 +64,7 @@ export function AlertPreferencesDialog({
   const [conditionSeverities, setConditionSeverities] = useState(
     preferences.conditionSeverities,
   );
+  const [timeThresholds, setTimeThresholds] = useState(() => Object.fromEntries(CONDITION_OPTIONS.map(({ kind }) => [kind, { urgent: String(preferences.timeThresholds[kind].urgent), warning: String(preferences.timeThresholds[kind].warning) }])) as Record<ConfigurableAlertKind, { urgent: string; warning: string }>);
   const updatePreferences = useUpdateAlertPreferences();
   const urgent = Number(urgentHours);
   const warning = Number(warningHours);
@@ -78,12 +73,18 @@ export function AlertPreferencesDialog({
     !Number.isInteger(warning) ||
     urgent < 0 ||
     warning <= urgent;
+  const perTypeThresholdsInvalid = CONDITION_OPTIONS.some(({ kind }) => {
+    const typeUrgent = Number(timeThresholds[kind].urgent);
+    const typeWarning = Number(timeThresholds[kind].warning);
+    return !Number.isInteger(typeUrgent) || !Number.isInteger(typeWarning) || typeUrgent < 0 || typeWarning <= typeUrgent;
+  });
 
   const openWithCurrentPreferences = () => {
     setMode(preferences.mode);
     setUrgentHours(String(preferences.urgentThresholdHours));
     setWarningHours(String(preferences.warningThresholdHours));
     setConditionSeverities(preferences.conditionSeverities);
+    setTimeThresholds(Object.fromEntries(CONDITION_OPTIONS.map(({ kind }) => [kind, { urgent: String(preferences.timeThresholds[kind].urgent), warning: String(preferences.timeThresholds[kind].warning) }])) as Record<ConfigurableAlertKind, { urgent: string; warning: string }>);
     setOpen(true);
   };
 
@@ -94,7 +95,7 @@ export function AlertPreferencesDialog({
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Configuración personal de alertas</DialogTitle>
             <DialogDescription>
@@ -177,6 +178,17 @@ export function AlertPreferencesDialog({
               </div>
             )}
 
+            <div className="grid gap-3">
+              <p className="text-sm font-medium">Ventanas por tipo de alerta</p>
+              {CONDITION_OPTIONS.map(({ kind, label }) => (
+                <div key={`time-${kind}`} className="grid grid-cols-[1fr_6rem_6rem] items-end gap-2">
+                  <FieldLabel>{label}</FieldLabel>
+                  <Field invalid={Number(timeThresholds[kind].warning) <= Number(timeThresholds[kind].urgent)}><FieldLabel htmlFor={`${kind}-urgent-hours`}>Alta</FieldLabel><Input id={`${kind}-urgent-hours`} aria-label={`${label}: horas para Alta`} type="number" min="0" step="1" value={timeThresholds[kind].urgent} onChange={(event) => setTimeThresholds((current) => ({ ...current, [kind]: { ...current[kind], urgent: event.target.value } }))} /></Field>
+                  <Field invalid={Number(timeThresholds[kind].warning) <= Number(timeThresholds[kind].urgent)}><FieldLabel htmlFor={`${kind}-warning-hours`}>Media</FieldLabel><Input id={`${kind}-warning-hours`} aria-label={`${label}: horas para Media`} type="number" min="1" step="1" value={timeThresholds[kind].warning} onChange={(event) => setTimeThresholds((current) => ({ ...current, [kind]: { ...current[kind], warning: event.target.value } }))} /></Field>
+                </div>
+              ))}
+              {perTypeThresholdsInvalid ? <FieldError>En cada tipo, Media debe tener más horas que Alta.</FieldError> : null}
+            </div>
             {mode === "condition" && (
               <div className="grid gap-3">
                 {CONDITION_OPTIONS.map(({ kind, label }) => (
@@ -204,7 +216,7 @@ export function AlertPreferencesDialog({
                     >
                       <SelectTrigger id={`condition-${kind}`} className="w-32">
                         <SelectValue>
-                          {SEVERITY_LABELS[conditionSeverities[kind]]}
+                          {getAlertSeverityLabel(conditionSeverities[kind])}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
@@ -224,13 +236,18 @@ export function AlertPreferencesDialog({
           <DialogFooter>
             <DialogClose render={<Button variant="outline" />}>Cancelar</DialogClose>
             <Button
-              disabled={thresholdsInvalid || updatePreferences.isPending}
+              disabled={thresholdsInvalid || perTypeThresholdsInvalid || updatePreferences.isPending}
               onClick={() => {
                 updatePreferences.mutate(
                   {
                     relevanceMode: mode,
                     urgentThresholdHours: urgent,
                     warningThresholdHours: warning,
+                    noContactUrgentThresholdHours: Number(timeThresholds.no_contact.urgent), noContactWarningThresholdHours: Number(timeThresholds.no_contact.warning),
+                    followUpUrgentThresholdHours: Number(timeThresholds.follow_up.urgent), followUpWarningThresholdHours: Number(timeThresholds.follow_up.warning),
+                    futureCallUrgentThresholdHours: Number(timeThresholds.future_call.urgent), futureCallWarningThresholdHours: Number(timeThresholds.future_call.warning),
+                    appointmentUrgentThresholdHours: Number(timeThresholds.appointment.urgent), appointmentWarningThresholdHours: Number(timeThresholds.appointment.warning),
+                    rescheduledUrgentThresholdHours: Number(timeThresholds.rescheduled.urgent), rescheduledWarningThresholdHours: Number(timeThresholds.rescheduled.warning),
                     noContactSeverity: conditionSeverities.no_contact,
                     followUpSeverity: conditionSeverities.follow_up,
                     futureCallSeverity: conditionSeverities.future_call,

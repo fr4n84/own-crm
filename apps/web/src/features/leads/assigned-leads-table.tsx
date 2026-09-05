@@ -23,6 +23,7 @@ import AssignLeadDrawer from "@/features/leads/assign-lead-drawer";
 import { getCallerResponseStatus } from "@/features/leads/response-status";
 import { CALLER_FEEDBACK_OPTIONS, matchesCallerFeedbackFilter, type CallerFeedbackFilter } from "@/features/leads/caller-feedback";
 import { DateRangePicker } from "@/components/date-range-picker";
+import { matchesLeadDateRange } from "./lead-date-filter";
 import {
   Select,
   SelectContent,
@@ -35,40 +36,6 @@ import {
 type DateField = "createdAt" | "updatedAt";
 type CloserFilter = "all" | string;
 type ResponseFilter = "all" | "Si" | "No" | "Sin asignar";
-
-function parseLocalDate(isoDate: string | undefined, endOfDay = false) {
-  if (!isoDate) return undefined;
-
-  const parts = isoDate.split("-");
-  if (parts.length !== 3) return undefined;
-
-  const year = Number(parts[0]);
-  const month = Number(parts[1]);
-  const day = Number(parts[2]);
-  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
-    return undefined;
-  }
-
-  const date = new Date(
-    year,
-    month - 1,
-    day,
-    endOfDay ? 23 : 0,
-    endOfDay ? 59 : 0,
-    endOfDay ? 59 : 0,
-    endOfDay ? 999 : 0
-  );
-
-  if (
-    date.getFullYear() !== year ||
-    date.getMonth() !== month - 1 ||
-    date.getDate() !== day
-  ) {
-    return undefined;
-  }
-
-  return date;
-}
 
 type LeadType = "maestra" | "vsl";
 
@@ -140,17 +107,9 @@ export function AssignedLeadsTable({
       setSelectedCloserId("all");
     }
   }, [availableCloserIds, selectedCloserId]);
-  const fromDate = parseLocalDate(dateRange?.from);
-  const toDate = parseLocalDate(dateRange?.to, true);
   const filteredLeads = leads?.filter((lead) => {
-    let matchesDate = true;
-    if (fromDate || toDate) {
-      const leadDate = new Date(lead[dateField]);
-      matchesDate =
-        !Number.isNaN(leadDate.getTime()) &&
-        (!fromDate || leadDate >= fromDate) &&
-        (!toDate || leadDate <= toDate);
-    }
+    const matchesDate = matchesLeadDateRange(lead, dateField, dateRange);
+
     const matchesCloser = activeCloserId === "all" || lead.closerId === activeCloserId;
     const matchesResponse =
       selectedResponse === "all" ||

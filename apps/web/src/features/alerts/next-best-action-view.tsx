@@ -5,8 +5,10 @@ import { Button } from "@crm-fran/ui/components/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@crm-fran/ui/components/card";
 import { Empty } from "@crm-fran/ui/components/empty";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm-fran/ui/components/table";
+import { SkipForwardIcon } from "lucide-react";
 
 import AssignLeadDrawer, { type Lead } from "@/features/leads/assign-lead-drawer";
+import LeadViewDrawer from "@/features/leads/lead-view-drawer";
 import type { NextBestActionWorkMode } from "./next-best-action-mode";
 
 export type NextBestAction = {
@@ -106,7 +108,7 @@ export function NextBestActionView({
         </CardContent>
         <CardFooter className="flex flex-wrap gap-2">
           <AssignLeadDrawer lead={first.lead} mode={drawerMode} triggerLabel="Gestionar ahora" onOpen={() => onOpen?.(first)} onCompleted={() => onCompleted?.(first)} />
-          {onSkip && <Button variant="ghost" type="button" onClick={() => onSkip(first)}>Omitir</Button>}
+          {onSkip && <Button variant="ghost" type="button" aria-label={`Omitir ${first.lead.name}`} onClick={() => onSkip(first)}><SkipForwardIcon aria-hidden="true" /><span className="max-md:sr-only">Omitir</span></Button>}
         </CardFooter>
       </Card>
 
@@ -118,20 +120,21 @@ export function NextBestActionView({
         <CardContent className="max-h-96 overflow-auto px-0">
           <Table>
             <TableHeader className="sticky top-0 bg-background">
-              <TableRow><TableHead>Orden</TableHead><TableHead>Prioridad</TableHead><TableHead>Lead</TableHead><TableHead>Acción</TableHead><TableHead>Por qué es la mejor ahora</TableHead><TableHead>Acciones</TableHead></TableRow>
+              <TableRow><TableHead className="max-md:hidden">Orden</TableHead><TableHead className="max-md:hidden">Prioridad</TableHead><TableHead>Lead</TableHead><TableHead>Teléfono</TableHead><TableHead className="max-md:hidden">Acción</TableHead><TableHead className="max-md:hidden">Por qué es la mejor ahora</TableHead><TableHead>Acciones</TableHead></TableRow>
             </TableHeader>
             <TableBody>
               {remainingActions.map((action) => (
                 <TableRow key={action.recommendationKey ?? action.lead.id}>
-                  <TableCell>#{action.position}</TableCell>
-                  <TableCell><ActionBadge urgency={action.urgency} /></TableCell>
+                  <TableCell className="max-md:hidden">#{action.position}</TableCell>
+                  <TableCell className="max-md:hidden"><ActionBadge urgency={action.urgency} /></TableCell>
                   <TableCell className="font-medium">{action.lead.name}</TableCell>
-                  <TableCell>{ACTION_LABELS[action.actionType] ?? "Gestionar lead"}</TableCell>
-                  <TableCell className="max-w-80 whitespace-normal text-muted-foreground">{action.reasons[0]}</TableCell>
-                  <TableCell><div className="flex flex-wrap gap-1"><AssignLeadDrawer lead={action.lead} mode={drawerMode} triggerLabel="Abrir" onOpen={() => onOpen?.(action)} onCompleted={() => onCompleted?.(action)} />{onSkip && <Button variant="ghost" size="sm" type="button" onClick={() => onSkip(action)}>Omitir</Button>}</div></TableCell>
+                  <TableCell>{action.lead.phone}</TableCell>
+                  <TableCell className="max-md:hidden">{ACTION_LABELS[action.actionType] ?? "Gestionar lead"}</TableCell>
+                  <TableCell className="max-w-80 whitespace-normal text-muted-foreground max-md:hidden">{action.reasons[0]}</TableCell>
+                  <TableCell><div className="flex flex-wrap gap-1"><LeadViewDrawer lead={action.lead} triggerAriaLabel={`Ver detalles de ${action.lead.name}`} /><AssignLeadDrawer lead={action.lead} mode={drawerMode} triggerLabel="Gestionar" onOpen={() => onOpen?.(action)} onCompleted={() => onCompleted?.(action)} />{onSkip && <Button variant="ghost" size="sm" type="button" aria-label={`Omitir ${action.lead.name}`} onClick={() => onSkip(action)}><SkipForwardIcon aria-hidden="true" /><span className="max-md:sr-only">Omitir</span></Button>}</div></TableCell>
                 </TableRow>
               ))}
-              {remainingActions.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No hay más acciones pendientes.</TableCell></TableRow>}
+              {remainingActions.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No hay más acciones pendientes.</TableCell></TableRow>}
             </TableBody>
           </Table>
         </CardContent>

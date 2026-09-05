@@ -30,6 +30,7 @@ import { Textarea } from "@crm-fran/ui/components/textarea";
 import { Checkbox } from "@crm-fran/ui/components/checkbox";
 import { CallRecordingPanel } from "./call-recording-panel";
 import { CALLER_FEEDBACK_OPTIONS } from "./caller-feedback";
+import { resolveEntityLabel } from "./select-label";
 import type { CallerOutcome } from "@crm-fran/api/caller-outcome";
 
 type AlertSeverity = "urgent" | "warning" | "info";
@@ -448,7 +449,7 @@ export default function AssignLeadForm({
 
   return (
     <form
-      className="mx-auto w-full max-w-lg"
+      className="mx-auto w-full max-w-3xl [&_[data-slot=select-trigger]]:w-full"
       id={formId}
       data-testid="assign-lead-form"
       onSubmit={(event) => {
@@ -457,7 +458,7 @@ export default function AssignLeadForm({
       }}
     >
       <FieldGroup>
-        <CallRecordingPanel leadId={leadId} onDraft={applyAiDraft} />
+        <CallRecordingPanel leadId={leadId} feedbackRole="caller" onDraft={(draft) => applyAiDraft(draft as CallFeedbackDraft)} />
 
         <form.Field name="isContacted">
           {(field) => (
@@ -782,6 +783,7 @@ export default function AssignLeadForm({
                     <Input
                       id="scheduledTime"
                       type="time"
+                      step={900}
                       value={field.state.value}
                       onChange={(event) => field.handleChange(event.target.value)}
                       aria-invalid={field.state.meta.errors.length > 0}
@@ -839,7 +841,7 @@ export default function AssignLeadForm({
                     onValueChange={(value) => field.handleChange(value ?? "")}
                   >
                     <SelectTrigger id="closerId">
-                      <SelectValue placeholder="Seleccione un closer" />
+                      <SelectValue>{field.state.value ? resolveEntityLabel(closers.data, field.state.value, closers.isLoading ? "Cargando closer…" : "Closer no disponible") : "Seleccione un closer"}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
@@ -892,6 +894,7 @@ export default function AssignLeadForm({
                     <Input
                       id="scheduledTime"
                       type="time"
+                      step={900}
                       value={field.state.value}
                       onChange={(event) => field.handleChange(event.target.value)}
                       aria-invalid={field.state.meta.errors.length > 0}

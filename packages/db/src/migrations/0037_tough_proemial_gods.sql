@@ -1,0 +1,4 @@
+ALTER TABLE "closer_sale_records" ADD COLUMN "payment_method" text;--> statement-breakpoint
+ALTER TABLE "closer_sale_records" ADD COLUMN "financing_provider" text;--> statement-breakpoint
+ALTER TABLE "closer_sale_records" ADD COLUMN "installment_months" integer;--> statement-breakpoint
+ALTER TABLE "closer_sale_records" ADD CONSTRAINT "closer_sale_records_payment_plan_check" CHECK (("closer_sale_records"."payment_method" IS NULL AND "closer_sale_records"."financing_provider" IS NULL AND "closer_sale_records"."installment_months" IS NULL) OR ("closer_sale_records"."payment_method" = 'fullpay' AND "closer_sale_records"."financing_provider" IS NULL AND "closer_sale_records"."installment_months" IS NULL) OR ("closer_sale_records"."payment_method" = 'financed' AND NULLIF(BTRIM("closer_sale_records"."financing_provider"), '') IS NOT NULL AND "closer_sale_records"."installment_months" BETWEEN 1 AND 600));

@@ -1,3 +1,7 @@
+import { issuePasswordResetCode, PasswordRecoveryError } from "@crm-fran/auth/password-recovery";
+import { and, db, eq } from "@crm-fran/db";
+import { COMMERCIAL_ROLE_IDS, user } from "@crm-fran/db/schema/auth";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { router } from "../index";
 import { permittedProcedure } from "@crm-fran/api/trpc/trpc";
@@ -22,6 +26,27 @@ const navigationVisibilityInput = z.object({
 });
 
 export const usersRouter = router({
+  issuePasswordResetCode: permittedProcedure(["*"]).input(z.object({ userId: z.string().min(1).max(128) }))
+    .mutation(async ({ ctx, input }) => {
+      try { return await issuePasswordResetCode(ctx.session.user.id, input.userId); }
+      catch (error) { throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof PasswordRecoveryError ? error.message : "No se pudo generar el código. Inténtalo de nuevo." }); }
+    }),
+  updateCommercialRole: permittedProcedure(["*"])
+    .input(z.object({
+      userId: z.string().trim().min(1),
+      expectedRoleId: z.enum(COMMERCIAL_ROLE_IDS),
+      roleId: z.enum(COMMERCIAL_ROLE_IDS),
+    }))
+    .mutation(async ({ input }) => {
+      const [updated] = await db.update(user)
+        .set({ roleId: input.roleId })
+        .where(and(eq(user.id, input.userId), eq(user.roleId, input.expectedRoleId)))
+        .returning({ id: user.id, roleId: user.roleId });
+      if (!updated) {
+        throw new TRPCError({ code: "CONFLICT", message: "User role changed or cannot be edited. Refresh and try again." });
+      }
+      return updated;
+    }),
 	listClosers: permittedProcedure(["users:read"])
 		.input(z.object({}).optional())
 		.query(async () => {

@@ -52,4 +52,16 @@ describe("alert preferences input", () => {
       }).success,
     ).toBe(false);
   });
+  it("validates urgent and warning windows independently for every alert type", () => {
+    const result = alertPreferencesInput.safeParse({
+      relevanceMode: "time", urgentThresholdHours: 2, warningThresholdHours: 6,
+      ...conditionSeverities,
+      noContactUrgentThresholdHours: 3, noContactWarningThresholdHours: 2,
+      followUpUrgentThresholdHours: 1, followUpWarningThresholdHours: 4,
+      futureCallUrgentThresholdHours: 1, futureCallWarningThresholdHours: 4,
+      appointmentUrgentThresholdHours: 1, appointmentWarningThresholdHours: 4,
+      rescheduledUrgentThresholdHours: 1, rescheduledWarningThresholdHours: 4,
+    });
+    expect(result.success).toBe(false);
+  });
 });

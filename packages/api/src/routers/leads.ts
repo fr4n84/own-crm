@@ -1,4 +1,7 @@
+import { TRPCError } from "@trpc/server";
+import { observatoryProcedure } from "../trpc/observatory";
 import { z } from "zod";
+import { quarterHourTimeSchema } from "../scheduling/time-slot";
 import { router } from "../index";
 import {
   getAll,
@@ -57,7 +60,7 @@ const qaSessionInput = z.discriminatedUnion("isContacted", [
     leadId: z.string().min(1),
     isContacted: z.literal("Si"),
     scheduledDate: z.string().min(1).optional(),
-    scheduledTime: z.string().min(1).optional(),
+    scheduledTime: quarterHourTimeSchema.optional(),
     questions: z.array(
       z.object({
         questionKey: z.string().min(1),
@@ -129,7 +132,7 @@ export const assignLeadInput = z.union([
     isContacted: z.literal("Si"),
     outcome: z.literal("future_call"),
     scheduledDate: z.string().date(),
-    scheduledTime: z.string().regex(/^\d{2}:\d{2}$/),
+    scheduledTime: quarterHourTimeSchema,
     alertSeverity: z.enum(["urgent", "warning", "info"]),
     questions: callerQuestionsInput,
   }),
@@ -151,7 +154,7 @@ export const assignLeadInput = z.union([
     outcome: z.literal("appointment"),
     closerId: z.string().min(1),
     scheduledDate: z.string().date(),
-    scheduledTime: z.string().regex(/^\d{2}:\d{2}$/),
+    scheduledTime: quarterHourTimeSchema,
     questions: callerQuestionsInput,
   }),
   z.object({
@@ -159,7 +162,7 @@ export const assignLeadInput = z.union([
     isContacted: z.literal("Si"),
     closerId: z.string().min(1),
     scheduledDate: z.string().min(1).optional(),
-    scheduledTime: z.string().min(1).optional(),
+    scheduledTime: quarterHourTimeSchema.optional(),
     questions: z.array(
       z.object({
         questionKey: z.string().min(1),
@@ -185,6 +188,7 @@ export const assignLeadInput = z.union([
 );
 
 export const leadsRouter = router({
+  observatoryFeedbackStatistics: observatoryProcedure(["leads:read"]).input(feedbackStatisticsInput).query(({input}) => getFeedbackStatistics(input)),
 	monthlyCallFeedbackUsage: permittedProcedure(["*"]).query(() =>
 		getMonthlyCallFeedbackUsage(),
 	),
@@ -202,8 +206,10 @@ export const leadsRouter = router({
 
 	feedbackStatistics: permittedProcedure(["leads:read"])
 		.input(feedbackStatisticsInput)
-		.query(async ({ input }) => {
-			return await getFeedbackStatistics(input);
+		.query(async ({ ctx, input }) => {
+      const actorScope = ctx.permissions.includes("*") ? undefined : ctx.session.user.id;
+      if (actorScope && input.callerId && input.callerId !== actorScope) throw new TRPCError({code:"FORBIDDEN",message:"Solo puedes consultar tu calidad personal"});
+			return await getFeedbackStatistics(actorScope ? {...input,callerId:actorScope} : input, actorScope);
 		}),
 
   listAll: permittedProcedure(["leads:read"])
@@ -251,7 +257,7 @@ export const leadsRouter = router({
 
   /**
    * Asigna un lead a un caller para que empiece a trabajarlo.
-   * Falla con `CONFLICT` si el caller ya tiene un lead en estado "sin asignar".
+   * Falla con `CONFLICT` si el caller ya tiene un lead prospectivo pendiente.
    */
   assignLeadToCaller: permittedProcedure(["leads:write"])
     .input(z.object({ id: z.string() }))

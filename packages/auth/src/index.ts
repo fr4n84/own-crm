@@ -5,6 +5,8 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 
+import { userRoleHooks } from "./role-policy";
+
 export function createAuth() {
   const db = createDb();
 
@@ -14,6 +16,7 @@ export function createAuth() {
 
       schema: schema,
     }),
+    databaseHooks: { user: userRoleHooks },
     user: {
       additionalFields: {
         roleId: {

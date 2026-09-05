@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+vi.mock("@crm-fran/db", () => ({ alias: (table: unknown) => table, and: vi.fn(), asc: vi.fn(), eq: vi.fn(), gte: vi.fn(), inArray: vi.fn(), lte: vi.fn(), db: new Proxy({}, { get() { throw new Error("Database access forbidden in pure statistics tests"); } }) }));
 
 import {
   aggregateLeadConditions,
@@ -236,6 +237,6 @@ describe("personal lead statistics", () => {
     );
 
     expect(result.total).toBe(1);
-    expect(result.counts.sale).toBe(1);
+    expect(result.counts).toHaveProperty("sale", 1);
   });
 });

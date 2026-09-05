@@ -12,6 +12,13 @@ import { user } from "./auth";
 import { leadFinancialEvents } from "./lead-financial-events";
 import { leads } from "./leads";
 
+export const SALE_PAYMENT_METHOD = {
+  FULLPAY: "fullpay",
+  FINANCED: "financed",
+} as const;
+export type SalePaymentMethod =
+  (typeof SALE_PAYMENT_METHOD)[keyof typeof SALE_PAYMENT_METHOD];
+
 export const closerSaleRecords = pgTable(
   "closer_sale_records",
   {
@@ -28,6 +35,9 @@ export const closerSaleRecords = pgTable(
     amountPaidCents: integer("amount_paid_cents").default(0).notNull(),
     currency: text("currency").default("EUR").notNull(),
     soldAt: timestamp("sold_at", { withTimezone: true }).notNull(),
+    paymentMethod: text("payment_method").$type<SalePaymentMethod>(),
+    financingProvider: text("financing_provider"),
+    installmentMonths: integer("installment_months"),
     contractedSaleEventId: text("contracted_sale_event_id")
       .notNull()
       .references(() => leadFinancialEvents.id, { onDelete: "restrict" }),
@@ -58,6 +68,10 @@ export const closerSaleRecords = pgTable(
     check(
       "closer_sale_records_currency_check",
       sql`${table.currency} ~ '^[A-Z]{3}$'`,
+    ),
+    check(
+      "closer_sale_records_payment_plan_check",
+      sql`(${table.paymentMethod} IS NULL AND ${table.financingProvider} IS NULL AND ${table.installmentMonths} IS NULL) OR (${table.paymentMethod} = 'fullpay' AND ${table.financingProvider} IS NULL AND ${table.installmentMonths} IS NULL) OR (${table.paymentMethod} = 'financed' AND NULLIF(BTRIM(${table.financingProvider}), '') IS NOT NULL AND ${table.installmentMonths} BETWEEN 1 AND 600)`,
     ),
   ],
 );

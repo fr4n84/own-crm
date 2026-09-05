@@ -45,6 +45,16 @@ export const alertPreferences = pgTable(
 			.notNull(),
 		urgentThresholdHours: integer("urgent_threshold_hours").default(2).notNull(),
 		warningThresholdHours: integer("warning_threshold_hours").default(6).notNull(),
+		noContactUrgentThresholdHours: integer("no_contact_urgent_threshold_hours").default(2).notNull(),
+		noContactWarningThresholdHours: integer("no_contact_warning_threshold_hours").default(6).notNull(),
+		followUpUrgentThresholdHours: integer("follow_up_urgent_threshold_hours").default(2).notNull(),
+		followUpWarningThresholdHours: integer("follow_up_warning_threshold_hours").default(6).notNull(),
+		futureCallUrgentThresholdHours: integer("future_call_urgent_threshold_hours").default(2).notNull(),
+		futureCallWarningThresholdHours: integer("future_call_warning_threshold_hours").default(6).notNull(),
+		appointmentUrgentThresholdHours: integer("appointment_urgent_threshold_hours").default(2).notNull(),
+		appointmentWarningThresholdHours: integer("appointment_warning_threshold_hours").default(6).notNull(),
+		rescheduledUrgentThresholdHours: integer("rescheduled_urgent_threshold_hours").default(2).notNull(),
+		rescheduledWarningThresholdHours: integer("rescheduled_warning_threshold_hours").default(6).notNull(),
 		noContactSeverity: text("no_contact_severity")
 			.$type<AlertSeverity>()
 			.default(ALERT_SEVERITY.URGENT)
@@ -84,6 +94,11 @@ export const alertPreferences = pgTable(
 			"alert_preferences_warning_threshold_check",
 			sql`${table.warningThresholdHours} > ${table.urgentThresholdHours}`,
 		),
+		check("alert_preferences_no_contact_time_check", sql`${table.noContactUrgentThresholdHours} >= 0 AND ${table.noContactWarningThresholdHours} > ${table.noContactUrgentThresholdHours}`),
+		check("alert_preferences_follow_up_time_check", sql`${table.followUpUrgentThresholdHours} >= 0 AND ${table.followUpWarningThresholdHours} > ${table.followUpUrgentThresholdHours}`),
+		check("alert_preferences_future_call_time_check", sql`${table.futureCallUrgentThresholdHours} >= 0 AND ${table.futureCallWarningThresholdHours} > ${table.futureCallUrgentThresholdHours}`),
+		check("alert_preferences_appointment_time_check", sql`${table.appointmentUrgentThresholdHours} >= 0 AND ${table.appointmentWarningThresholdHours} > ${table.appointmentUrgentThresholdHours}`),
+		check("alert_preferences_rescheduled_time_check", sql`${table.rescheduledUrgentThresholdHours} >= 0 AND ${table.rescheduledWarningThresholdHours} > ${table.rescheduledUrgentThresholdHours}`),
 		check(
 			"alert_preferences_no_contact_severity_check",
 			sql`${table.noContactSeverity} IN ('info', 'warning', 'urgent')`,

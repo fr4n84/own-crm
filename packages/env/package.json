@@ -17,5 +17,8 @@
     "@crm-fran/config": "workspace:*",
     "@types/node": "^22.13.14",
     "typescript": "catalog:"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit --composite false --incremental false"
   }
 }

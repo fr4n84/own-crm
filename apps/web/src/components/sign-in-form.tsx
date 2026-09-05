@@ -1,3 +1,5 @@
+import { queryClient } from "@/utils/trpc";
+import Link from "next/link";
 import { Button } from "@crm-fran/ui/components/button";
 import { Input } from "@crm-fran/ui/components/input";
 import { Label } from "@crm-fran/ui/components/label";
@@ -27,6 +29,7 @@ export default function SignInForm() {
         },
         {
           onSuccess: () => {
+            queryClient.clear();
             router.push("/");
             toast.success("Sign in successful");
           },
@@ -50,6 +53,7 @@ export default function SignInForm() {
 
   return (
     <div className="mx-auto w-full mt-10 max-w-md p-6">
+      <Link href="/recuperar-contrasena" className="text-sm underline">¿Has olvidado tu contraseña?</Link>
       <h1 className="mb-6 text-center text-3xl font-bold">Welcome Back</h1>
 
       <form

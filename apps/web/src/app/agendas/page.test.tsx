@@ -1,7 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import AgendasPage from "./page";
+
+afterEach(cleanup);
 
 const mocks = vi.hoisted(() => ({
   listAllQueryOptions: vi.fn(() => ({ queryKey: ["leads", "listAll"] })),
@@ -101,5 +104,28 @@ describe("AgendasPage", () => {
     render(<AgendasPage />);
 
     expect(screen.getByText("No hay agendas")).toBeInTheDocument();
+  });
+
+  it("shows the selected closer name and combines it with name search", async () => {
+    const user = userEvent.setup();
+    mocks.useQuery.mockReturnValue({
+      data: [
+        { id: "agenda-1", name: "Álvaro Pérez", caller: null, closer: { id: "closer-long-uuid", name: "Ana Closer" }, questions: [{ questionKey: "callerOutcome", answer: "Agenda", authorRole: "caller" }] },
+        { id: "agenda-2", name: "Beatriz", caller: null, closer: { id: "closer-2", name: "Berta Closer" }, questions: [{ questionKey: "callerOutcome", answer: "Agenda", authorRole: "caller" }] },
+      ],
+      isLoading: false,
+      isError: false,
+    });
+    render(<AgendasPage />);
+
+    const closer = screen.getByRole("combobox", { name: "Filtrar por closer" });
+    await user.click(closer);
+    await user.click(screen.getByRole("option", { name: "Ana Closer" }));
+    expect(closer).toHaveTextContent("Ana Closer");
+    expect(closer).not.toHaveTextContent("closer-long-uuid");
+
+    await user.type(screen.getByLabelText("Nombre"), "alvaro");
+    expect(screen.getByTestId("agenda-table")).toHaveTextContent("Álvaro Pérez");
+    expect(screen.getByTestId("agenda-table")).not.toHaveTextContent("Beatriz");
   });
 });

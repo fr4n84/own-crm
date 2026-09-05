@@ -1,4 +1,5 @@
 "use client";
+import { PasswordResetCode } from "./password-reset-code";
 
 import { useDeferredValue, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -25,6 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@crm-fran/ui/component
 import { usePermissionState } from "@crm-fran/ui/permissions";
 import {
   canAccessNavigationItem,
+  canViewConfiguredNavigationItem,
   navigationModulesForPermissions,
   PRIMARY_NAVIGATION_ITEMS,
 } from "@crm-fran/ui/lib/navigation-policy";
@@ -33,6 +35,48 @@ import { toast } from "sonner";
 import { trpc } from "@/utils/trpc";
 
 type StatusFilter = "all" | "verified" | "pending";
+
+const COMMERCIAL_ROLES = [
+  { value: "role-caller", label: "Caller" },
+  { value: "role-closer", label: "Closer" },
+  { value: "role-caller-closer", label: "Híbrido" },
+] as const;
+
+export function CommercialRoleEditor({ userId, name, roleId }: { userId: string; name: string; roleId: string }) {
+  const [confirmedRoleId, setConfirmedRoleId] = useState(roleId);
+  const [refreshFailed, setRefreshFailed] = useState(false);
+  const currentRole = COMMERCIAL_ROLES.find((role) => role.value === confirmedRoleId);
+  const [selected, setSelected] = useState(roleId);
+  const queryClient = useQueryClient();
+  const update = useMutation(trpc.users.updateCommercialRole.mutationOptions({
+    onSuccess: async (updated) => {
+      // The write is committed even when refreshing the directory fails.
+      setConfirmedRoleId(updated.roleId);
+      setRefreshFailed(false);
+      toast.success("Rol actualizado");
+      try {
+        await queryClient.invalidateQueries({ queryKey: trpc.users.accessDirectory.queryKey() }, { throwOnError: true });
+      } catch {
+        setRefreshFailed(true);
+        toast.error("El rol está guardado, pero no se pudo actualizar el directorio. Recarga la página para ver los permisos actuales.");
+      }
+    },
+    onError: (error) => toast.error(error.message),
+  }));
+  if (!currentRole) return null;
+  const nextRole = COMMERCIAL_ROLES.find((role) => role.value === selected);
+  return <div className="mt-2 flex flex-wrap items-center gap-2">
+    <Select value={selected} onValueChange={(value) => value && setSelected(value)} disabled={update.isPending} items={[...COMMERCIAL_ROLES]}>
+      <SelectTrigger aria-label={`Rol de ${name}`}><SelectValue /></SelectTrigger>
+      <SelectContent>{COMMERCIAL_ROLES.map((role) => <SelectItem key={role.value} value={role.value}>{role.label}</SelectItem>)}</SelectContent>
+    </Select>
+    <Button size="sm" disabled={!nextRole || selected === confirmedRoleId || update.isPending} onClick={() => {
+      if (!nextRole || !window.confirm(`¿Cambiar el rol de ${name} a ${nextRole.label}?`)) return;
+      update.mutate({ userId, expectedRoleId: currentRole.value, roleId: nextRole.value });
+    }}>{update.isPending ? "Guardando…" : "Guardar rol"}</Button>
+    {refreshFailed && <p role="status" className="text-xs text-muted-foreground">Rol guardado. Recarga la página para actualizar los permisos y el directorio.</p>}
+  </div>;
+}
 
 function Information() {
   return (
@@ -46,7 +90,7 @@ function Information() {
         <PopoverHeader>
           <PopoverTitle>Cómo interpretar esta vista</PopoverTitle>
           <PopoverDescription>
-            Resume el rol guardado y sus permisos efectivos. Los módulos se calculan con la misma política que usa el menú lateral. Ocultar un módulo no revoca permisos y mostrarlo nunca concede acceso: la visibilidad efectiva es la selección guardada combinada con los permisos reales. La API sigue siendo la autoridad y valida cada operación en el servidor.
+            Resume el rol guardado y sus permisos efectivos. Los módulos se calculan con la misma política que usa el menú lateral. La selección del Observatorio comercial controla también su acceso en el servidor; no amplía las funciones administrativas. Caller y Closer empiezan sin acceso salvo una selección explícita guardada. El resto de módulos conserva sus permisos de API: esta matriz cambia su visibilidad.
           </PopoverDescription>
         </PopoverHeader>
       </PopoverContent>
@@ -85,7 +129,7 @@ type AccessRole = {
 function defaultRoleIdsByModule(roles: readonly AccessRole[]) {
   return Object.fromEntries(PRIMARY_NAVIGATION_ITEMS.map((module) => [
     module.id,
-    roles.filter((role) => canAccessNavigationItem(module, role.effectivePermissions)).map((role) => role.id),
+    roles.filter((role) => canViewConfiguredNavigationItem(module, role.id, role.effectivePermissions)).map((role) => role.id),
   ]));
 }
 
@@ -117,7 +161,7 @@ function VisibilityEditor({
   const save = useMutation(trpc.users.updateNavigationVisibility.mutationOptions({
     onSuccess: async () => {
       toast.success("Visibilidad del menú guardada");
-      await queryClient.invalidateQueries({ queryKey: trpc.users.navigationVisibility.queryKey() });
+      await Promise.all([queryClient.invalidateQueries({ queryKey: trpc.users.navigationVisibility.queryKey() }),queryClient.invalidateQueries({queryKey:trpc.auth.getMyAccess.queryKey()})]);
     },
     onError: (error) => toast.error(error.message),
   }));
@@ -131,7 +175,7 @@ function VisibilityEditor({
   }
 
   function persist() {
-    if (!window.confirm("¿Guardar quién puede ver cada módulo en el menú? Los permisos de la API no cambiarán.")) return;
+    if (!window.confirm("¿Guardar quién puede ver cada módulo en el menú? En Observatorio comercial también se concederá o revocará acceso; los demás permisos no cambiarán.")) return;
     save.mutate({
       expectedVersion: version,
       entries: PRIMARY_NAVIGATION_ITEMS.map((module) => ({ moduleId: module.id, roleIds: draft[module.id] ?? [] })),
@@ -205,7 +249,7 @@ export function UsersAccessView() {
     return <main className="dashboard-arc-theme bg-background p-4 sm:p-6"><LoadingState /></main>;
   }
   if (directory.isError || visibility.isError || !directory.data || !visibility.data) {
-    return <main className="dashboard-arc-theme bg-background p-4 sm:p-6"><Empty heading="No se pudo cargar usuarios y accesos" description="Vuelve a intentarlo. Ningún permiso se ha modificado." /></main>;
+    return <main className="dashboard-arc-theme bg-background p-4 sm:p-6"><Empty heading="No se pudo cargar usuarios y accesos" description="Recarga la página para consultar los permisos actuales. Los cambios ya confirmados siguen guardados." /></main>;
   }
 
   const { users, roles } = directory.data;
@@ -262,10 +306,10 @@ export function UsersAccessView() {
             <CardContent>
               {users.length === 0 ? <Empty heading="No hay usuarios para estos filtros" description="Prueba otra búsqueda, rol o estado." /> : <>
                 <div className="grid gap-3 lg:hidden">
-                  {users.map((person) => <Card key={person.id} size="sm"><CardHeader><div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><CardTitle className="break-words">{person.name}</CardTitle><CardDescription className="break-all">{person.email}</CardDescription></div><StatusBadge status={person.status} /></div></CardHeader><CardContent className="flex flex-col gap-3"><div className="flex flex-wrap gap-1">{person.roles.map((role) => <Badge key={role.id} variant="secondary">{role.name}</Badge>)}</div><PermissionBadges permissions={person.effectivePermissions} /></CardContent></Card>)}
+                  {users.map((person) => <Card key={person.id} size="sm"><CardHeader><div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><CardTitle className="break-words">{person.name}</CardTitle><CardDescription className="break-all">{person.email}</CardDescription></div><StatusBadge status={person.status} /></div></CardHeader><CardContent className="flex flex-col gap-3"><div className="flex flex-wrap gap-1">{person.roles.map((role) => <Badge key={role.id} variant="secondary">{role.name}</Badge>)}</div><PasswordResetCode userId={person.id} name={person.name} /><CommercialRoleEditor key={person.roles[0]?.id} userId={person.id} name={person.name} roleId={person.roles[0]?.id ?? ""} /><PermissionBadges permissions={person.effectivePermissions} /></CardContent></Card>)}
                 </div>
                 <div className="hidden overflow-x-auto lg:block">
-                  <Table><TableHeader><TableRow><TableHead>Usuario</TableHead><TableHead>Estado</TableHead><TableHead>Rol</TableHead><TableHead>Permisos efectivos</TableHead></TableRow></TableHeader><TableBody>{users.map((person) => <TableRow key={person.id}><TableCell><div className="flex min-w-48 flex-col"><span className="font-medium">{person.name}</span><span className="text-xs text-muted-foreground">{person.email}</span></div></TableCell><TableCell><StatusBadge status={person.status} /></TableCell><TableCell>{person.roles.map((role) => <Badge key={role.id} variant="secondary">{role.name}</Badge>)}</TableCell><TableCell><PermissionBadges permissions={person.effectivePermissions} /></TableCell></TableRow>)}</TableBody></Table>
+                  <Table><TableHeader><TableRow><TableHead>Usuario</TableHead><TableHead>Estado</TableHead><TableHead>Rol</TableHead><TableHead>Permisos efectivos</TableHead></TableRow></TableHeader><TableBody>{users.map((person) => <TableRow key={person.id}><TableCell><div className="flex min-w-48 flex-col"><span className="font-medium">{person.name}</span><span className="text-xs text-muted-foreground">{person.email}</span></div></TableCell><TableCell><StatusBadge status={person.status} /></TableCell><TableCell>{person.roles.map((role) => <Badge key={role.id} variant="secondary">{role.name}</Badge>)}<PasswordResetCode userId={person.id} name={person.name} /><CommercialRoleEditor key={person.roles[0]?.id} userId={person.id} name={person.name} roleId={person.roles[0]?.id ?? ""} /></TableCell><TableCell><PermissionBadges permissions={person.effectivePermissions} /></TableCell></TableRow>)}</TableBody></Table>
                 </div>
               </>}
             </CardContent>
@@ -274,7 +318,7 @@ export function UsersAccessView() {
 
         <TabsContent value="roles">
           {roles.length === 0 ? <Empty heading="No hay roles configurados" description="No existe una política de acceso que mostrar." /> : <div className="flex flex-col gap-4"><VisibilityEditor key={visibility.data.version} roles={roles} version={visibility.data.version} configured={visibility.data.configured} roleIdsByModule={visibility.data.roleIdsByModule} /><div className="grid gap-3 xl:grid-cols-2">{roles.map((role) => {
-            const modules = navigationModulesForPermissions(role.effectivePermissions);
+            const modules = navigationModulesForPermissions(role.effectivePermissions).filter(module=>canViewConfiguredNavigationItem(module,role.id,role.effectivePermissions,visibility.data.configured?{roleIdsByModule:visibility.data.roleIdsByModule}:undefined));
             return <Card key={role.id}><CardHeader><div className="flex flex-wrap items-center justify-between gap-2"><CardTitle className="flex items-center gap-2"><ShieldCheckIcon aria-hidden="true" />{role.name}</CardTitle><Badge variant="secondary">{role.userCount} {role.userCount === 1 ? "usuario" : "usuarios"}</Badge></div><CardDescription>{role.id}</CardDescription></CardHeader><CardContent className="grid gap-4 sm:grid-cols-2"><section className="flex min-w-0 flex-col gap-2"><h2 className="text-sm font-semibold">Permisos efectivos</h2><PermissionBadges permissions={role.effectivePermissions} /></section><section className="flex min-w-0 flex-col gap-2"><h2 className="text-sm font-semibold">Módulos visibles</h2><div className="flex flex-wrap gap-1">{modules.map((module) => <Badge key={module.id} variant="outline">{module.title}</Badge>)}</div></section><section className="flex min-w-0 flex-col gap-2 sm:col-span-2"><h2 className="text-sm font-semibold">Usuarios con este rol</h2>{role.users.length === 0 ? <p className="text-xs text-muted-foreground">Ningún usuario asignado.</p> : <ul className="grid gap-2 sm:grid-cols-2">{role.users.map((person) => <li key={person.id} className="flex min-w-0 items-center justify-between gap-2 rounded-lg border p-3"><span className="min-w-0"><span className="block break-words text-sm font-medium">{person.name}</span><span className="block break-all text-xs text-muted-foreground">{person.email}</span></span><StatusBadge status={person.status} /></li>)}</ul>}</section></CardContent></Card>;
           })}</div></div>}
         </TabsContent>

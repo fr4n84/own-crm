@@ -82,7 +82,15 @@ export function canViewConfiguredNavigationItem(
   configuration?: NavigationVisibilityConfiguration,
 ) {
   if (!canAccessNavigationItem(item, permissions)) return false;
-  if (item.id === "users-access" && permissions.includes("*")) return true;
+  if ((item.id === "users-access" || item.id === "commercial-observatory") && permissions.includes("*")) return true;
   const configuredRoles = configuration?.roleIdsByModule[item.id];
+  if (configuredRoles === undefined && item.id === "commercial-observatory") return Boolean(roleId && roleId !== "role-caller" && roleId !== "role-closer");
   return configuredRoles === undefined || Boolean(roleId && configuredRoles.includes(roleId));
+}
+
+export function presentNavigationForRole<T extends PrimaryNavigationItem>(items: readonly T[], roleId: string | null | undefined): T[] {
+  if (roleId !== "role-closer") return [...items];
+  return items
+    .filter((item) => item.id !== "general-leads" && item.id !== "whatsapp")
+    .map((item) => item.id === "personal-leads" ? { ...item, title: "Leads" } : item) as T[];
 }

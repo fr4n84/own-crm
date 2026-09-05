@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getEffectiveAlertSeverity } from "./alert-relevance";
+import { DEFAULT_ALERT_RELEVANCE_PREFERENCES, getEffectiveAlertSeverity } from "./alert-relevance";
 
 const HOUR_MS = 60 * 60 * 1000;
 const createdAt = new Date("2099-01-01T00:00:00.000Z");
@@ -14,6 +14,7 @@ describe("effective alert relevance", () => {
           mode: "condition",
           urgentThresholdHours: 2,
           warningThresholdHours: 6,
+          timeThresholds: DEFAULT_ALERT_RELEVANCE_PREFERENCES.timeThresholds,
           conditionSeverities: {
             no_contact: "urgent",
             follow_up: "info",
@@ -35,6 +36,7 @@ describe("effective alert relevance", () => {
           mode: "condition",
           urgentThresholdHours: 2,
           warningThresholdHours: 6,
+          timeThresholds: DEFAULT_ALERT_RELEVANCE_PREFERENCES.timeThresholds,
           conditionSeverities: {
             no_contact: "urgent",
             follow_up: "info",
@@ -61,6 +63,7 @@ describe("effective alert relevance", () => {
           mode: "condition",
           urgentThresholdHours: 2,
           warningThresholdHours: 6,
+          timeThresholds: DEFAULT_ALERT_RELEVANCE_PREFERENCES.timeThresholds,
           conditionSeverities: {
             no_contact: "urgent",
             follow_up: "info",
@@ -79,6 +82,7 @@ describe("effective alert relevance", () => {
       mode: "time" as const,
       urgentThresholdHours: 2,
       warningThresholdHours: 6,
+      timeThresholds: DEFAULT_ALERT_RELEVANCE_PREFERENCES.timeThresholds,
       conditionSeverities: {
         no_contact: "urgent" as const,
         follow_up: "info" as const,
@@ -119,6 +123,7 @@ describe("effective alert relevance", () => {
           mode: "time",
           urgentThresholdHours: 2,
           warningThresholdHours: 6,
+          timeThresholds: DEFAULT_ALERT_RELEVANCE_PREFERENCES.timeThresholds,
           conditionSeverities: {
             no_contact: "urgent",
             follow_up: "info",
@@ -130,5 +135,19 @@ describe("effective alert relevance", () => {
         createdAt.getTime() + 13 * HOUR_MS,
       ),
     ).toBe("urgent");
+  });
+  it("uses the time thresholds configured for each alert type", () => {
+    const preferences = {
+      ...DEFAULT_ALERT_RELEVANCE_PREFERENCES,
+      mode: "time" as const,
+      timeThresholds: {
+        ...DEFAULT_ALERT_RELEVANCE_PREFERENCES.timeThresholds,
+        follow_up: { urgent: 1, warning: 2 },
+        appointment: { urgent: 10, warning: 20 },
+      },
+    };
+    const alert = { severity: "info", createdAt: "2026-09-04T10:00:00.000Z" };
+    expect(getEffectiveAlertSeverity({ ...alert, kind: "follow_up" }, preferences, new Date("2026-09-04T21:30:00.000Z").getTime())).toBe("urgent");
+    expect(getEffectiveAlertSeverity({ ...alert, kind: "appointment" }, preferences, new Date("2026-09-04T08:00:00.000Z").getTime())).toBe("warning");
   });
 });

@@ -19,6 +19,7 @@ import { askCrmRouter } from "./ask-crm";
 import { marketingAttributionRouter } from "./marketing-attribution";
 import { closerSalesRouter } from "./closer-sales";
 import { whatsappRouter } from "./whatsapp";
+import { suggestionsRouter } from "./suggestions";
 import { permittedProcedure } from "@crm-fran/api/trpc/trpc";
 import { publicProcedure, router } from "../index";
 
@@ -62,5 +63,6 @@ export const appRouter = router({
   marketingAttribution: marketingAttributionRouter,
   closerSales: closerSalesRouter,
   whatsapp: whatsappRouter,
+  suggestions: suggestionsRouter,
 });
 export type AppRouter = typeof appRouter;

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { router } from "../index";
-import { permittedProcedure } from "../trpc/trpc";
+import { observatoryProcedure as permittedProcedure } from "../trpc/observatory";
 import { getConfidenceCentre,getLeadEvidence,getMicrosegments,listEvidenceCurrencies,listEvidenceLeads } from "../commercial-evidence/service";
 const asOf=z.coerce.date().refine(x=>x<=new Date(),"asOf cannot be in the future");
 export const commercialEvidenceRouter=router({

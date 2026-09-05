@@ -142,6 +142,13 @@ export function useAlertPreferences() {
       mode: preferences.relevanceMode,
       urgentThresholdHours: preferences.urgentThresholdHours,
       warningThresholdHours: preferences.warningThresholdHours,
+      timeThresholds: {
+        no_contact: { urgent: preferences.noContactUrgentThresholdHours ?? preferences.urgentThresholdHours, warning: preferences.noContactWarningThresholdHours ?? preferences.warningThresholdHours },
+        follow_up: { urgent: preferences.followUpUrgentThresholdHours ?? preferences.urgentThresholdHours, warning: preferences.followUpWarningThresholdHours ?? preferences.warningThresholdHours },
+        future_call: { urgent: preferences.futureCallUrgentThresholdHours ?? preferences.urgentThresholdHours, warning: preferences.futureCallWarningThresholdHours ?? preferences.warningThresholdHours },
+        appointment: { urgent: preferences.appointmentUrgentThresholdHours ?? preferences.urgentThresholdHours, warning: preferences.appointmentWarningThresholdHours ?? preferences.warningThresholdHours },
+        rescheduled: { urgent: preferences.rescheduledUrgentThresholdHours ?? preferences.urgentThresholdHours, warning: preferences.rescheduledWarningThresholdHours ?? preferences.warningThresholdHours },
+      },
       conditionSeverities: {
         no_contact: preferences.noContactSeverity,
         follow_up: preferences.followUpSeverity,

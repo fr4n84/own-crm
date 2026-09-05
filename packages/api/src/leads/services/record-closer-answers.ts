@@ -18,6 +18,7 @@ import { hasPermission } from "../../permissions";
 import { deriveCloserRankingMetrics } from "../../rankings/ranking-metrics";
 import { appendLeadActivity } from "./lead-activity";
 import { getScheduledAt } from "./caller-outcome";
+import { canOpenCloserFeedback, isCloserOutcome } from "./closer-answer-policy";
 
 const CLOSER_ALERT_OUTCOMES = {
   "No-show": ALERT_KIND.NO_CONTACT,
@@ -91,9 +92,18 @@ export async function recordCloserAnswers({
   }
 
   const { leadId, isContacted, questions = [] } = input;
+  const nextOutcome = questions.find(
+    (question) => question.questionKey === "closerOutcome",
+  )?.answer;
+  if (!isCloserOutcome(nextOutcome)) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Seleccione un resultado válido para la agenda",
+    });
+  }
 
-	  return db.transaction(async (tx) => {
-	    const activityOccurredAt = new Date();
+  return db.transaction(async (tx) => {
+    const activityOccurredAt = new Date();
     const [lead] = await tx
       .select()
       .from(leads)
@@ -117,6 +127,9 @@ export async function recordCloserAnswers({
     }
 
 	    const allItems = (lead.questions ?? []) as LeadQASessionItem[];
+	    if (!canOpenCloserFeedback(allItems)) {
+	      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Este lead no tiene una agenda pendiente" });
+	    }
 	    const previousOutcome = [...allItems]
 	      .reverse()
 	      .find(
@@ -124,9 +137,6 @@ export async function recordCloserAnswers({
 	          item.authorRole === LEAD_QA_ROLE.CLOSER &&
 	          item.questionKey === "closerOutcome",
 	      )?.answer;
-	    const nextOutcome = questions.find(
-	      (question) => question.questionKey === "closerOutcome",
-	    )?.answer;
 
     const preservedItems = allItems.filter(
       (item) =>

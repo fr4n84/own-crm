@@ -165,3 +165,5 @@ describe("buildConversionFunnel", () => {
     ]);
   });
 });
+
+it("exposes the unique cohort lead count and requested response label", () => { const result=buildConversionFunnel([]);expect(result.leadCount).toBe(0);expect(result.stages.find(stage=>stage.key==="contacted")?.label).toBe("Respuesta"); });

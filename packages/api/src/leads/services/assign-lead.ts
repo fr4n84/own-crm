@@ -317,6 +317,7 @@ export async function assignLead({
 					: authorRole === LEAD_QA_ROLE.CLOSER
 						? lead.callerId
 						: callerId,
+				callerAssignedAt: isWrongNumber ? null : lead.callerAssignedAt,
 				closerId: isWrongNumber ? null : closerId ?? lead.closerId,
 				poolStatus: isWrongNumber
 					? LEAD_POOL_STATUS.DISCARDED

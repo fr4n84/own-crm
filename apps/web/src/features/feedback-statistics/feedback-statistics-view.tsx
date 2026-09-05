@@ -71,7 +71,7 @@ export function FeedbackStatisticsView() {
   const [drilldown, setDrilldown] = useState<Drilldown>(null);
   const invalidInterval = Boolean(from && to && from > to);
   const statistics = useQuery({
-    ...trpc.leads.feedbackStatistics.queryOptions({
+    ...trpc.leads.observatoryFeedbackStatistics.queryOptions({
       callerId: caller.id === "all" ? undefined : caller.id,
       source: source === "all" ? undefined : source,
       campaign: campaign === "all" ? undefined : campaign,

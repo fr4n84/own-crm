@@ -141,7 +141,7 @@ describe("alerts router", () => {
     created.alertIds.push(result.id);
   });
 
-  it("lists unresolved alerts for all users", async () => {
+  it("shares unresolved alerts with every participant of the same lead", async () => {
     const closerId = crypto.randomUUID();
     const otherCloserId = crypto.randomUUID();
     const leadId = crypto.randomUUID();
@@ -225,7 +225,7 @@ describe("alerts router", () => {
     expect(result.map(({ lead }) => lead.id)).toEqual([ownLeadId]);
   });
 
-  it("counts unresolved alerts for all users", async () => {
+  it("counts only alerts shared with the authenticated participant", async () => {
     const closerId = crypto.randomUUID();
     const otherCloserId = crypto.randomUUID();
     const leadId = crypto.randomUUID();
@@ -240,10 +240,10 @@ describe("alerts router", () => {
     await insertAlert({ leadId, targetUserId: closerId });
     await insertAlert({ leadId, targetUserId: otherCloserId });
 
-    await expect(caller.alerts.countAlerts()).resolves.toBe(countBeforeInsertion + 2);
+    await expect(caller.alerts.countAlerts()).resolves.toBe(countBeforeInsertion + 1);
   });
 
-  it("narrows global pending alerts with an explicit targetUserId filter", async () => {
+  it("does not let a targetUserId filter widen participant access", async () => {
     const closerId = crypto.randomUUID();
     const otherCloserId = crypto.randomUUID();
     const leadId = crypto.randomUUID();
@@ -259,7 +259,7 @@ describe("alerts router", () => {
     const result = await caller.alerts.listAlerts({ targetUserId: otherCloserId });
     const resultIds = result.map((alert) => alert.id);
 
-    expect(resultIds).toContain(otherAlertId);
+    expect(resultIds).not.toContain(otherAlertId);
     expect(resultIds).not.toContain(ownAlertId);
   });
 
@@ -296,6 +296,21 @@ describe("alerts router", () => {
     expect(result.id).toBe(alertId);
     expect(result.dismissedAt).toBeInstanceOf(Date);
     expect(result.dismissedBy).toBe(closerId);
+  });
+
+  it("lets the caller and closer resolve or dismiss their one shared alert", async () => {
+    const callerId = crypto.randomUUID();
+    const closerId = crypto.randomUUID();
+    const leadId = crypto.randomUUID();
+    await insertUser({ id: callerId, name: "Caller", email: `${callerId}@test.com`, roleId: "role-caller" });
+    await insertUser({ id: closerId, name: "Closer", email: `${closerId}@test.com`, roleId: "role-closer" });
+    await insertLead({ id: leadId, callerId, closerId });
+    const resolvedAlertId = await insertAlert({ leadId, targetUserId: closerId });
+    const dismissedAlertId = await insertAlert({ leadId, targetUserId: closerId });
+
+    const caller = createCaller(callerId, "role-caller", ["alerts:read", "alerts:write", "users:read"]);
+    await expect(caller.alerts.resolveAlert({ id: resolvedAlertId })).resolves.toMatchObject({ id: resolvedAlertId });
+    await expect(caller.alerts.dismissAlert({ id: dismissedAlertId })).resolves.toMatchObject({ id: dismissedAlertId, dismissedBy: callerId });
   });
 
   it("resolves an alert and stops recurrence", async () => {

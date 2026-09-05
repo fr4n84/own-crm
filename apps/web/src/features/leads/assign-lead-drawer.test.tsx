@@ -94,6 +94,10 @@ const baseLead = {
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
 };
+const agendaLead = {
+  ...baseLead,
+  questions: [{ questionKey: "callerOutcome", question: "¿Qué ha sucedido?", answer: "Agenda", authorRole: "caller" as const, authorId: "caller-1" }],
+};
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -142,7 +146,7 @@ describe("AssignLeadDrawer — orquesta submitFormId por rol", () => {
     setupRole("role-caller");
     const user = userEvent.setup();
 
-    render(<AssignLeadDrawer lead={baseLead} />);
+    render(<AssignLeadDrawer lead={agendaLead} />);
     await openDrawer(user);
 
     expect(screen.getByTestId("assign-lead-form")).toBeInTheDocument();
@@ -155,7 +159,7 @@ describe("AssignLeadDrawer — orquesta submitFormId por rol", () => {
     setupRole("role-closer");
     const user = userEvent.setup();
 
-    render(<AssignLeadDrawer lead={baseLead} />);
+    render(<AssignLeadDrawer lead={agendaLead} />);
     await openDrawer(user);
 
     expect(screen.getByTestId("closer-qa-form")).toBeInTheDocument();
@@ -179,7 +183,7 @@ describe("AssignLeadDrawer — orquesta submitFormId por rol", () => {
 
     render(
       <AssignLeadDrawer
-        lead={baseLead}
+        lead={agendaLead}
         mode="post-assignment-feedback"
         defaultOpen
         hideTrigger
@@ -197,7 +201,7 @@ describe("AssignLeadDrawer — orquesta submitFormId por rol", () => {
 
     render(
       <AssignLeadDrawer
-        lead={baseLead}
+        lead={agendaLead}
         triggerLabel="Feedback"
         mode="agenda-feedback"
       />,
@@ -216,11 +220,20 @@ describe("AssignLeadDrawer — orquesta submitFormId por rol", () => {
     setupRole("role-caller");
     const user = userEvent.setup();
 
-    render(<AssignLeadDrawer lead={{ ...baseLead, closerId: "user-1" }} triggerLabel="Gestionar ahora" mode="agenda-feedback" />);
+    render(<AssignLeadDrawer lead={{ ...agendaLead, closerId: "user-1" }} triggerLabel="Gestionar ahora" mode="agenda-feedback" />);
     await user.click(screen.getByRole("button", { name: "Gestionar ahora" }));
 
     expect(screen.getByTestId("closer-qa-form")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /guardar/i })).toHaveAttribute("form", "closer-qa-form");
+  });
+
+  it("closer sees caller feedback notice instead of an empty form without pending work", async () => {
+    setupRole("role-closer");
+    const user = userEvent.setup();
+    render(<AssignLeadDrawer lead={baseLead} />);
+    await openDrawer(user);
+    expect(screen.queryByTestId("closer-qa-form")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("no tiene una agenda");
   });
 
   it("admin: muestra el formulario operativo de acciones del caller", async () => {

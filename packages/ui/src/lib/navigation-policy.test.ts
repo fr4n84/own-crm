@@ -5,6 +5,7 @@ import {
   canViewConfiguredNavigationItem,
   navigationModulesForPermissions,
   PRIMARY_NAVIGATION_ITEMS,
+  presentNavigationForRole,
 } from "./navigation-policy";
 
 describe("navigation policy", () => {
@@ -42,3 +43,11 @@ describe("navigation policy", () => {
     expect(canViewConfiguredNavigationItem(usersAccess, "role-admin", ["*"], configuration)).toBe(true);
   });
 });
+
+it("simplifies the exact closer navigation without changing other roles", () => {
+  const visible = PRIMARY_NAVIGATION_ITEMS.filter((item) => ["general-leads", "personal-leads", "whatsapp"].includes(item.id));
+  expect(presentNavigationForRole(visible, "role-closer").map(({ id, title }) => ({ id, title }))).toEqual([{ id: "personal-leads", title: "Leads" }]);
+  expect(presentNavigationForRole(visible, "role-caller-closer").map(({ id }) => id)).toEqual(["general-leads", "personal-leads", "whatsapp"]);
+});
+
+it("hides caller and closer observatory by default but permits explicit grants",()=>{const item=PRIMARY_NAVIGATION_ITEMS.find(item=>item.id==="commercial-observatory")!;expect(canViewConfiguredNavigationItem(item,"role-caller",["leads:read"])).toBe(false);expect(canViewConfiguredNavigationItem(item,"role-closer",["leads:read"])).toBe(false);expect(canViewConfiguredNavigationItem(item,"role-caller-closer",["leads:read"])).toBe(true);expect(canViewConfiguredNavigationItem(item,"role-caller",["leads:read"],{roleIdsByModule:{"commercial-observatory":["role-caller"]}})).toBe(true);});

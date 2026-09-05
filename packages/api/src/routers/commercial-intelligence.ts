@@ -5,7 +5,7 @@ import { getObjectionMotivationIntelligence } from "../commercial-intelligence/o
 import { archiveLibraryVersion, createLibraryDraft, listLibraryVersions, publishLibraryVersion } from "../commercial-library/service";
 import { normalizeMadridRange } from "../commercial-observatory/domain";
 import { router } from "../index";
-import { permittedProcedure } from "../trpc/trpc";
+import { observatoryProcedure as permittedProcedure } from "../trpc/observatory";
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).superRefine((value, context) => {
   const [year, month, day] = value.split("-").map(Number);

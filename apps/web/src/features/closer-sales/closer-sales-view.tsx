@@ -15,9 +15,11 @@ import { Empty } from "@crm-fran/ui/components/empty";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@crm-fran/ui/components/field";
 import { Input } from "@crm-fran/ui/components/input";
 import { Skeleton } from "@crm-fran/ui/components/skeleton";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@crm-fran/ui/components/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm-fran/ui/components/table";
 
 import { trpc } from "@/utils/trpc";
+import { formatSalePaymentPlan } from "./sale-payment-label";
 
 type ContractFile = {
   storageKey: string;
@@ -34,6 +36,9 @@ type EditorState = {
   saleAmount: string;
   amountPaid: string;
   soldOn: string;
+  paymentMethod: "" | "fullpay" | "financed";
+  financingProvider: string;
+  installmentMonths: string;
   financialOperationId: string;
   onboardingCompleted: boolean;
   onboardingVideoUrl: string;
@@ -66,6 +71,11 @@ export function CloserSalesView() {
     amountPaid: sale.record ? String(sale.record.amountPaidCents / 100) : "0",
     soldOn: sale.record?.soldAt
       ? new Date(sale.record.soldAt).toISOString().slice(0, 10)
+      : "",
+    paymentMethod: sale.record?.paymentMethod ?? "",
+    financingProvider: sale.record?.financingProvider ?? "",
+    installmentMonths: sale.record?.installmentMonths
+      ? String(sale.record.installmentMonths)
       : "",
     financialOperationId: crypto.randomUUID(),
     onboardingCompleted: sale.record?.onboardingCompleted ?? false,
@@ -108,6 +118,20 @@ export function CloserSalesView() {
       toast.error("Selecciona la fecha de venta");
       return;
     }
+    const installmentMonths = editor.paymentMethod === "financed"
+      ? Number(editor.installmentMonths)
+      : null;
+    if (
+      editor.paymentMethod === "financed"
+      && (editor.financingProvider.trim() === ""
+        || !Number.isInteger(installmentMonths)
+        || installmentMonths === null
+        || installmentMonths < 1
+        || installmentMonths > 600)
+    ) {
+      toast.error("Indica la financiera y un número de meses válido");
+      return;
+    }
     update.mutate({
       leadId: editor.leadId,
       contract: editor.contract,
@@ -115,6 +139,11 @@ export function CloserSalesView() {
       saleAmountCents,
       amountPaidCents,
       soldOn: editor.soldOn,
+      paymentMethod: editor.paymentMethod || null,
+      financingProvider: editor.paymentMethod === "financed"
+        ? editor.financingProvider.trim()
+        : null,
+      installmentMonths,
       financialOperationId: editor.financialOperationId,
       onboardingCompleted: editor.onboardingCompleted,
       onboardingVideoUrl: editor.onboardingVideoUrl.trim() || null,
@@ -153,13 +182,14 @@ export function CloserSalesView() {
         <CardContent className="overflow-x-auto">
           {rows.length === 0 ? <Empty heading="Todavía no hay ventas" description="Aparecerán cuando el feedback del closer marque Venta o exista una venta heredada confirmada." /> : (
             <Table>
-              <TableHeader><TableRow><TableHead>Lead</TableHead><TableHead>Origen</TableHead><TableHead>Closer</TableHead><TableHead>Venta</TableHead><TableHead>Cobro</TableHead><TableHead>Evidencia</TableHead><TableHead>Contrato</TableHead><TableHead>Onboarding</TableHead><TableHead>Acciones</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Lead</TableHead><TableHead>Origen</TableHead><TableHead>Closer</TableHead><TableHead>Venta</TableHead><TableHead>Forma de pago</TableHead><TableHead>Cobro</TableHead><TableHead>Evidencia</TableHead><TableHead>Contrato</TableHead><TableHead>Onboarding</TableHead><TableHead>Acciones</TableHead></TableRow></TableHeader>
               <TableBody>{rows.map((sale) => (
                 <TableRow key={sale.id}>
                   <TableCell><div className="flex min-w-48 flex-col"><span className="font-medium">{sale.name}</span><span className="text-xs text-muted-foreground">{sale.email || sale.phone}</span></div></TableCell>
                   <TableCell>{sale.source && sale.campaign ? `${sale.source} · ${sale.campaign}` : "Sin atribuir"}</TableCell>
                   <TableCell>{sale.closer?.name ?? "Sin closer"}</TableCell>
                   <TableCell>{sale.record ? money(sale.record.saleAmountCents) : "Pendiente"}</TableCell>
+                  <TableCell>{sale.record ? formatSalePaymentPlan(sale.record) : "Sin clasificar"}</TableCell>
                   <TableCell>{sale.record ? <PaymentBadge paid={sale.record.amountPaidCents} total={sale.record.saleAmountCents} /> : "Pendiente"}</TableCell>
                   <TableCell><Badge variant={sale.saleEvidence === "confirmed" ? "secondary" : "outline"}>{sale.saleEvidence === "confirmed" ? "Confirmada" : "Dato heredado parcial"}</Badge></TableCell>
                   <TableCell>{sale.record?.contractUrl ? <Button variant="outline" size="sm" render={<a href={sale.record.contractUrl} target="_blank" rel="noreferrer" />}><FileTextIcon data-icon="inline-start" />Ver contrato</Button> : "Pendiente"}</TableCell>
@@ -180,6 +210,8 @@ export function CloserSalesView() {
             <Field><FieldLabel htmlFor="sales-call-url">Enlace de la llamada de venta</FieldLabel><Input id="sales-call-url" type="url" placeholder="https://..." value={editor.salesCallUrl} onChange={(event) => setEditor({ ...editor, salesCallUrl: event.target.value })} /></Field>
             <Field><FieldLabel htmlFor="sale-date">Fecha de venta</FieldLabel><Input id="sale-date" type="date" value={editor.soldOn} onChange={(event) => setEditor({ ...editor, soldOn: event.target.value })} /></Field>
             <Field><FieldLabel htmlFor="sale-amount">Importe de la venta (€)</FieldLabel><Input id="sale-amount" type="number" min="0.01" step="0.01" inputMode="decimal" value={editor.saleAmount} onChange={(event) => setEditor({ ...editor, saleAmount: event.target.value })} /><FieldDescription>Registra el total contratado, aunque todavía no se haya cobrado entero.</FieldDescription></Field>
+            <Field><FieldLabel htmlFor="payment-method">Forma de pago</FieldLabel><Select value={editor.paymentMethod || null} onValueChange={(value) => setEditor({ ...editor, paymentMethod: (value ?? "") as EditorState["paymentMethod"], financingProvider: value === "financed" ? editor.financingProvider : "", installmentMonths: value === "financed" ? editor.installmentMonths : "" })} items={[{ value: "fullpay", label: "Fullpay" }, { value: "financed", label: "Financiada" }]}><SelectTrigger id="payment-method"><SelectValue>{editor.paymentMethod === "fullpay" ? "Fullpay" : editor.paymentMethod === "financed" ? "Financiada" : "Sin clasificar"}</SelectValue></SelectTrigger><SelectContent><SelectGroup><SelectItem value="fullpay">Fullpay</SelectItem><SelectItem value="financed">Financiada</SelectItem></SelectGroup></SelectContent></Select><FieldDescription>Las ventas antiguas permanecen sin clasificar hasta que se editen.</FieldDescription></Field>
+            {editor.paymentMethod === "financed" ? <div className="grid gap-4 sm:grid-cols-2"><Field><FieldLabel htmlFor="financing-provider">Financiera</FieldLabel><Input id="financing-provider" value={editor.financingProvider} onChange={(event) => setEditor({ ...editor, financingProvider: event.target.value })} /></Field><Field><FieldLabel htmlFor="installment-months">Número de meses</FieldLabel><Input id="installment-months" type="number" min="1" max="600" step="1" value={editor.installmentMonths} onChange={(event) => setEditor({ ...editor, installmentMonths: event.target.value })} /></Field></div> : null}
             <Field><FieldLabel htmlFor="amount-paid">Importe cobrado (€)</FieldLabel><Input id="amount-paid" type="number" min="0" step="0.01" inputMode="decimal" value={editor.amountPaid} onChange={(event) => setEditor({ ...editor, amountPaid: event.target.value })} /><FieldDescription>0 significa pendiente; un importe menor al total aparecerá como cobro parcial. Los nuevos cobros se registran con la fecha actual.</FieldDescription></Field>
             <label className="flex min-h-11 items-center gap-3"><Checkbox checked={editor.onboardingCompleted} onCheckedChange={(checked) => setEditor({ ...editor, onboardingCompleted: checked })} /><span className="font-medium">Onboarding realizado</span></label>
             <Field><FieldLabel htmlFor="onboarding-video-url">Enlace al vídeo de onboarding</FieldLabel><Input id="onboarding-video-url" type="url" placeholder="https://..." value={editor.onboardingVideoUrl} onChange={(event) => setEditor({ ...editor, onboardingVideoUrl: event.target.value })} /></Field>

@@ -117,6 +117,10 @@ export function PermissionProvider({
   );
 }
 
+export function ResolvedPermissionProvider({ children, value }: { children: React.ReactNode; value: PermissionState }) {
+  return <PermissionContext.Provider value={value}>{children}</PermissionContext.Provider>;
+}
+
 // ── Hooks ────────────────────────────────────────────────────────────────────
 
 /** Full state. Use when you need loading/error info (e.g. spinners, error UI). */

@@ -1,6 +1,7 @@
 import { relations, sql } from "drizzle-orm";
 import {
 	check,
+  index,
   integer,
   pgTable,
   text,
@@ -66,12 +67,14 @@ export const leads = pgTable("leads", {
       .$type<LeadState>()
       .notNull(),
     callerId: text("caller_id").references(() => user.id, { onDelete: "set null" }),
+    callerAssignedAt: timestamp("caller_assigned_at", { withTimezone: true }),
     closerId: text("closer_id").references(() => user.id, { onDelete: "set null" }),
     poolStatus: text("pool_status")
       .$type<LeadPoolStatus>()
       .default(LEAD_POOL_STATUS.NEW)
       .notNull(),
     noContactImpactCount: integer("no_contact_impact_count").default(0).notNull(),
+    whatsappCallerId: text("whatsapp_caller_id").references(() => user.id, { onDelete: "set null" }),
     whatsappSentAt: timestamp("whatsapp_sent_at", { withTimezone: true }),
     whatsappSentById: text("whatsapp_sent_by_id").references(() => user.id, { onDelete: "set null" }),
     response: text("response").default("sin asignar").notNull(),
@@ -82,6 +85,7 @@ export const leads = pgTable("leads", {
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
 }, (table) => [
+  index("leads_whatsapp_caller_idx").on(table.whatsappCallerId),
 	check("leads_type_check", sql`${table.type} IN ('maestra', 'vsl')`),
 	check(
     "leads_pool_status_check",

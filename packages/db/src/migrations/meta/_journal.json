@@ -253,6 +253,34 @@
       "when": 1788303801907,
       "tag": "0035_sturdy_mockingbird",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1788549068199,
+      "tag": "0036_alert_type_windows_whatsapp_attribution",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1788551857769,
+      "tag": "0037_tough_proemial_gods",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1788629092058,
+      "tag": "0038_suggestions",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1788632340303,
+      "tag": "0039_caller_assignment_activation",
+      "breakpoints": true
     }
   ]
 }

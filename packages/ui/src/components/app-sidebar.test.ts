@@ -30,7 +30,8 @@ describe("app sidebar decision-center visibility", () => {
     expect(source).not.toContain('title: "Get Help"');
     expect(source).not.toContain('title: "Search"');
     expect(source).not.toContain("NavSecondary");
-    expect(source).toContain("<NavUser user={user} onSignOut={onSignOut} />");
+    expect(source).toContain("<NavUser user={user} onSignOut={onSignOut} onAccount={onAccount} />");
+    expect(source.indexOf('href="/sugerencias"')).toBeLessThan(source.indexOf("<NavUser"));
   });
   it("uses Aurea as the visible product name", () => {
     const source = readFileSync(new URL("./app-sidebar.tsx", import.meta.url), "utf8");

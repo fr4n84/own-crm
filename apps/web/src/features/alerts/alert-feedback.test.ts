@@ -9,7 +9,8 @@ describe("alert inline feedback", () => {
   it("opens the existing contact and feedback flow without changing tabs", () => {
     expect(source).toContain("<AssignLeadDrawer");
     expect(source).toContain('mode="post-assignment-feedback"');
-    expect(source).toContain('triggerLabel="Registrar gestión"');
+    expect(source).toContain('triggerLabel="Gestionar"');
+    expect(source).not.toContain("AlertResolutionDialog");
     expect(hookSource).toContain("closerId: alert.lead.closerId");
   });
 });

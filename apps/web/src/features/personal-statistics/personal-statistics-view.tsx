@@ -1,5 +1,7 @@
 "use client";
 
+import { authClient } from "@/lib/auth-client";
+import { usePermissions } from "@crm-fran/ui/permissions";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -118,6 +120,8 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function PersonalStatisticsView() {
+  const { data: session } = authClient.useSession();
+  const canCompareCallers = usePermissions().includes("*");
   const [people, setPeople] = useState(initialPeople);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -144,11 +148,11 @@ export function PersonalStatisticsView() {
   });
   const callerQuality = useQuery({
     ...trpc.leads.feedbackStatistics.queryOptions({
-      callerId: people.callerId === "all" ? undefined : people.callerId,
+      callerId: canCompareCallers ? (people.callerId === "all" ? undefined : people.callerId) : session?.user.id,
       from: from || undefined,
       to: to || undefined,
     }),
-    enabled: !invalidInterval && mode === "caller",
+    enabled: !invalidInterval && mode === "caller" && (canCompareCallers || Boolean(session?.user.id)),
   });
 
   return (
@@ -325,10 +329,10 @@ export function PersonalStatisticsView() {
         ) : callerQuality.isError ? (
           <Empty heading="No se pudo cargar el ranking de callers" />
         ) : callerQuality.data ? (
-          <CallerQualitySection
+          <><p className="text-xs text-muted-foreground">{canCompareCallers ? "Calidad del caller seleccionado" : "Tu calidad personal (sin datos de otros callers)"}</p><CallerQualitySection
             data={callerQuality.data.callerQuality}
             profileLabels={profileLabels}
-          />
+          /></>
         ) : null
       )}
 

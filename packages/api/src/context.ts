@@ -3,7 +3,7 @@ import { auth } from "@crm-fran/auth";
 import type { NextRequest } from "next/server";
 import type { ResolvedRole } from "@crm-fran/db/schema/auth";
 
-export async function createContext(req: NextRequest) {
+export async function createContext(req: Pick<NextRequest, "headers">) {
   const session = await auth.api.getSession({
     headers: req.headers,
   });

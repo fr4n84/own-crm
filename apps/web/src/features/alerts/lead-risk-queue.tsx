@@ -19,6 +19,7 @@ import {
 } from "@crm-fran/ui/components/table";
 
 import AssignLeadDrawer from "@/features/leads/assign-lead-drawer";
+import LeadViewDrawer from "@/features/leads/lead-view-drawer";
 
 import type { useLeadRiskQueue } from "./use-alerts";
 
@@ -68,36 +69,38 @@ export function LeadRiskQueue({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Prioridad</TableHead>
+                <TableHead className="max-md:hidden">Prioridad</TableHead>
                 <TableHead>Lead</TableHead>
-                <TableHead>Caller</TableHead>
-                <TableHead>Desde asignación</TableHead>
-                <TableHead>Intentos</TableHead>
-                <TableHead>Último intento</TableHead>
+                <TableHead>Teléfono</TableHead>
+                <TableHead className="max-md:hidden">Caller</TableHead>
+                <TableHead className="max-md:hidden">Desde asignación</TableHead>
+                <TableHead className="max-md:hidden">Intentos</TableHead>
+                <TableHead className="max-md:hidden">Último intento</TableHead>
                 <TableHead>Acción</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {data.map((item) => (
                 <TableRow key={item.lead.id}>
-                  <TableCell>
+                  <TableCell className="max-md:hidden">
                     <Badge variant={item.priority === "critical" ? "destructive" : "secondary"}>
                       {PRIORITY_LABELS[item.priority]}
                     </Badge>
                   </TableCell>
                   <TableCell className="font-medium">{item.lead.name}</TableCell>
-                  <TableCell>{item.lead.caller?.name ?? "Sin caller"}</TableCell>
-                  <TableCell>{formatElapsed(item.minutesSinceAssignment)}</TableCell>
-                  <TableCell>{item.attemptCount}</TableCell>
-                  <TableCell>{formatElapsed(item.minutesSinceLastAttempt)}</TableCell>
+                  <TableCell>{item.lead.phone}</TableCell>
+                  <TableCell className="max-md:hidden">{item.lead.caller?.name ?? "Sin caller"}</TableCell>
+                  <TableCell className="max-md:hidden">{formatElapsed(item.minutesSinceAssignment)}</TableCell>
+                  <TableCell className="max-md:hidden">{item.attemptCount}</TableCell>
+                  <TableCell className="max-md:hidden">{formatElapsed(item.minutesSinceLastAttempt)}</TableCell>
                   <TableCell>
-                    <AssignLeadDrawer lead={item.lead} triggerLabel="Abrir lead" />
+                    <div className="flex gap-1"><LeadViewDrawer lead={item.lead} triggerAriaLabel={`Ver detalles de ${item.lead.name}`} /><AssignLeadDrawer lead={item.lead} triggerLabel="Gestionar" /></div>
                   </TableCell>
                 </TableRow>
               ))}
               {data.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground">
                     No hay leads pendientes fuera del plazo de 15 minutos.
                   </TableCell>
                 </TableRow>

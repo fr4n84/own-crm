@@ -1,7 +1,7 @@
 @import "@crm-fran/ui/globals.css";
 
 /* Dashboard-only projection of the Arc tokens documented in DESIGN.md. */
-.dashboard-arc-theme {
+html:not(.dark) .dashboard-arc-theme {
   --background: #ffffff;
   --foreground: #3139fb;
   --card: #fffcec;
@@ -35,7 +35,7 @@
 }
 
 /* Observatory keeps Arc's yellow as an accent instead of a page-wide card fill. */
-.commercial-observatory-arc-theme.dashboard-arc-theme {
+html:not(.dark) .commercial-observatory-arc-theme.dashboard-arc-theme {
   --card: #ffffff;
   font-size: 14px;
   font-weight: 500;

@@ -77,6 +77,8 @@ export async function processRecurringAlerts(now: Date = new Date(), userId?: st
           .update(leads)
           .set({
             callerId: null,
+            callerAssignedAt: null,
+            whatsappCallerId: transition.poolStatus === LEAD_POOL_STATUS.DISCARDED ? dueAlert.targetUserId : null,
             state: LEAD_STATE.SIN_ASIGNAR,
             poolStatus: transition.poolStatus,
             noContactImpactCount: transition.impactCount,

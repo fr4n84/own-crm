@@ -6,6 +6,7 @@ import {
   canProcessLeadRecording,
   estimateCallFeedbackCostMicroUsd,
   processCallRecording,
+  closerCallFeedbackDraftSchema,
 } from "../call-feedback";
 import type { CallFeedbackDependencies } from "../call-feedback";
 
@@ -22,7 +23,7 @@ const validDraft = {
   trainingAndPriceAwareness: "",
   urgencyReason: "",
   summary: "No desea continuar",
-  extraInfo: "transient transcript",
+  extraInfo: "",
   scheduledDate: "",
   scheduledTime: "",
   alertSeverity: "",
@@ -32,7 +33,7 @@ function dependencies(
   overrides: Partial<CallFeedbackDependencies> = {},
 ): CallFeedbackDependencies {
   return {
-    findLead: vi.fn().mockResolvedValue({ id: "lead-1", callerId: "caller-1" }),
+    findLead: vi.fn().mockResolvedValue({ id: "lead-1", callerId: "caller-1", closerId: "closer-1" }),
     transcribe: vi.fn().mockResolvedValue("transient transcript"),
     summarize: vi.fn().mockResolvedValue({
       outputText: JSON.stringify({ ...validDraft, extraInfo: undefined }),
@@ -61,6 +62,8 @@ describe("call feedback", () => {
         permissions: ["leads:write"],
         userId: "caller-1",
         callerId: "caller-1",
+        closerId: "closer-1",
+        feedbackRole: "caller",
       }),
     ).toBe(true);
     expect(
@@ -68,6 +71,8 @@ describe("call feedback", () => {
         permissions: ["*"],
         userId: "admin-1",
         callerId: "caller-1",
+        closerId: "closer-1",
+        feedbackRole: "caller",
       }),
     ).toBe(true);
     expect(
@@ -75,8 +80,19 @@ describe("call feedback", () => {
         permissions: ["leads:write"],
         userId: "caller-2",
         callerId: "caller-1",
+        closerId: "closer-1",
+        feedbackRole: "caller",
       }),
     ).toBe(false);
+  });
+
+  it("authorizes the assigned closer only for closer feedback", () => {
+    expect(canProcessLeadRecording({ permissions: ["leads:write"], userId: "closer-1", callerId: "caller-1", closerId: "closer-1", feedbackRole: "closer" })).toBe(true);
+    expect(canProcessLeadRecording({ permissions: ["leads:write"], userId: "caller-1", callerId: "caller-1", closerId: "closer-1", feedbackRole: "closer" })).toBe(false);
+  });
+
+  it("validates a structured closer draft without transcript fields", () => {
+    expect(closerCallFeedbackDraftSchema.parse({ isContacted: "Si", closerOutcome: "Venta", closerFeedback: "Interesado", isDecisionMaker: "Si", decisionMakerName: "", financialSource: "", productFit: "", urgencyReason: "", extraInfo: "", scheduledDate: "", scheduledTime: "" })).toMatchObject({ closerOutcome: "Venta" });
   });
 
   it("accepts only drafts compatible with the existing feedback form", () => {
@@ -154,7 +170,8 @@ describe("call feedback", () => {
     });
 
     expect(result.draft).toEqual(validDraft);
-    expect(result.draft.extraInfo).toBe("transient transcript");
+    expect(result.draft.extraInfo).toBe("");
+    expect(JSON.stringify(result)).not.toContain("transient transcript");
     expect(recordUsage).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: "caller-1",
@@ -181,7 +198,7 @@ describe("call feedback", () => {
         permissions: ["leads:write"],
         dependencies: deps,
       }),
-    ).rejects.toThrow("Lead is not assigned to this caller");
+    ).rejects.toThrow("Lead is not assigned to this user");
     expect(transcribe).not.toHaveBeenCalled();
   });
 

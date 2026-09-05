@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { CallFeedbackDraft } from "@crm-fran/api/call-feedback";
+import type { CallFeedbackDraft, CloserCallFeedbackDraft, FeedbackRole } from "@crm-fran/api/call-feedback";
 import { Button } from "@crm-fran/ui/components/button";
 import {
   Card,
@@ -15,13 +15,17 @@ import { Field, FieldLabel } from "@crm-fran/ui/components/field";
 import { MicIcon, SquareIcon, XIcon } from "lucide-react";
 
 type RecordingState = "idle" | "ready" | "recording" | "processing";
+const MAX_AUDIO_BYTES = 20 * 1024 * 1024;
+const MAX_DURATION_MS = 120 * 60_000;
 
 export function CallRecordingPanel({
   leadId,
   onDraft,
+  feedbackRole = "caller",
 }: {
   leadId: string;
-  onDraft: (draft: CallFeedbackDraft) => void;
+  feedbackRole?: FeedbackRole;
+  onDraft: (draft: CallFeedbackDraft | CloserCallFeedbackDraft) => void;
 }) {
   const [state, setState] = useState<RecordingState>("idle");
   const [leadWasInformed, setLeadWasInformed] = useState(false);
@@ -29,10 +33,14 @@ export function CallRecordingPanel({
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const recordedBytesRef = useRef(0);
   const startedAtRef = useRef(0);
   const cancelledRef = useRef(false);
+  const stopTimerRef = useRef<number | undefined>(undefined);
 
   const releaseMicrophone = () => {
+    if (stopTimerRef.current !== undefined) window.clearTimeout(stopTimerRef.current);
+    stopTimerRef.current = undefined;
     for (const track of streamRef.current?.getTracks() ?? []) {
       track.stop();
     }
@@ -51,23 +59,26 @@ export function CallRecordingPanel({
 
   const reset = () => {
     chunksRef.current = [];
+    recordedBytesRef.current = 0;
     setLeadWasInformed(false);
     setState("idle");
   };
 
   const uploadRecording = async (blob: Blob, durationMs: number) => {
+    if (blob.size > MAX_AUDIO_BYTES || durationMs > MAX_DURATION_MS) throw new Error("La grabación supera el límite permitido");
     const formData = new FormData();
     const extension = blob.type.includes("ogg") ? "ogg" : "webm";
     formData.set("audio", new File([blob], `call.${extension}`, { type: blob.type }));
     formData.set("leadId", leadId);
     formData.set("durationMs", String(durationMs));
+    formData.set("feedbackRole", feedbackRole);
 
     const response = await fetch("/api/call-feedback", {
       method: "POST",
       body: formData,
     });
     const body = (await response.json()) as {
-      draft?: CallFeedbackDraft;
+      draft?: CallFeedbackDraft | CloserCallFeedbackDraft;
       error?: string;
     };
     if (!response.ok || !body.draft) {
@@ -81,6 +92,7 @@ export function CallRecordingPanel({
     setError(undefined);
     cancelledRef.current = false;
     chunksRef.current = [];
+    recordedBytesRef.current = 0;
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -96,7 +108,15 @@ export function CallRecordingPanel({
       );
       recorderRef.current = recorder;
       recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) chunksRef.current.push(event.data);
+        if (event.data.size <= 0) return;
+        recordedBytesRef.current += event.data.size;
+        if (recordedBytesRef.current > MAX_AUDIO_BYTES) {
+          cancelledRef.current = true;
+          setError("La grabación supera el límite permitido");
+          recorder.stop();
+          return;
+        }
+        chunksRef.current.push(event.data);
       };
       recorder.onstop = () => {
         const durationMs = Math.round(performance.now() - startedAtRef.current);
@@ -122,6 +142,7 @@ export function CallRecordingPanel({
       };
       startedAtRef.current = performance.now();
       recorder.start(1_000);
+      stopTimerRef.current = window.setTimeout(() => recorder.stop(), MAX_DURATION_MS);
       setState("recording");
     } catch {
       releaseMicrophone();
@@ -176,8 +197,8 @@ export function CallRecordingPanel({
               : "Preparar grabación"}
         </CardTitle>
         <CardDescription>
-          El audio no se guarda. La transcripción completa y el resumen se añadirán
-          al formulario para que los revises antes de guardarlos.
+          El audio y la transcripción no se guardan. La IA crea únicamente un borrador
+          estructurado para que lo revises antes de guardar.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">

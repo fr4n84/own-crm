@@ -17,6 +17,12 @@ import { authClient } from "@/lib/auth-client";
 
 import Loader from "./loader";
 
+const COMMERCIAL_ROLES = [
+  { value: "role-caller", label: "Caller" },
+  { value: "role-caller-closer", label: "Hybrid" },
+  { value: "role-closer", label: "Closer" },
+];
+
 export default function SignUpForm() {
   const router = useRouter();
   const { isPending } = authClient.useSession();
@@ -124,6 +130,7 @@ export default function SignUpForm() {
               <div className="space-y-2">
                 <Label htmlFor={field.name}>Role</Label>
                 <Select
+                  items={COMMERCIAL_ROLES}
                   id={field.name}
                   name={field.name}
                   value={field.state.value}
@@ -135,9 +142,7 @@ export default function SignUpForm() {
                     <SelectValue placeholder="Select a role" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="role-caller">Caller</SelectItem>
-                    <SelectItem value="role-admin">Admin</SelectItem>
-                    <SelectItem value="role-closer">Close</SelectItem>
+                    {COMMERCIAL_ROLES.map((role) => <SelectItem key={role.value} value={role.value}>{role.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 {field.state.meta.errors.map((error) => (

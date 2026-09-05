@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useQueries } from "@tanstack/react-query";
 import { ArrowDownIcon, InfoIcon, UsersRoundIcon } from "lucide-react";
 
 import { Badge } from "@crm-fran/ui/components/badge";
@@ -57,24 +57,28 @@ import {
 } from "@crm-fran/ui/components/table";
 
 import { trpc } from "@/utils/trpc";
+import { buildDashboardComparison } from "./dashboard-summary";
 
 type LeadTypeFilter = "all" | "maestra" | "vsl";
 
-function formatDateInput(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+function dayShift(day: string, amount: number) {
+  const date = new Date(day + "T12:00:00Z"); date.setUTCDate(date.getUTCDate() + amount); return date.toISOString().slice(0,10);
 }
-
-function getInitialInterval() {
-  const to = new Date();
-  const from = new Date();
-  from.setDate(from.getDate() - 29);
-  return { from: formatDateInput(from), to: formatDateInput(to) };
+function initialRanges() {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid", year:"numeric",month:"2-digit",day:"2-digit" }).formatToParts(new Date()).map(part=>[part.type,part.value]));
+  const to = parts.year + "-" + parts.month + "-" + parts.day;
+  return {from:dayShift(to,-29),to,compareFrom:dayShift(to,-59),compareTo:dayShift(to,-30)};
 }
-
-const initialInterval = getInitialInterval();
+export function validFunnelRange(from: string, to: string) {
+  const start = new Date(from + "T12:00:00Z"), end = new Date(to + "T12:00:00Z");
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) return false;
+  return /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to) && from <= to
+    && new Date(from + "T12:00:00Z").toISOString().slice(0,10) === from && new Date(to + "T12:00:00Z").toISOString().slice(0,10) === to;
+}
+function Comparison({ primary, reference }: { primary: number; reference: number }) {
+  const change=buildDashboardComparison(primary,reference);
+  return <p className="text-xs text-muted-foreground">Comparación: {reference} · Diferencia: {change.absolute>0?"+":""}{change.absolute}{change.percent===null?" · Base 0: porcentaje no comparable":" · "+(change.percent>0?"+":"")+change.percent+"%"}</p>;
+}
 
 function Information({ title, children }: { title: string; children: string }) {
   return (
@@ -102,24 +106,21 @@ function Information({ title, children }: { title: string; children: string }) {
 }
 
 export function ConversionFunnel() {
-  const [from, setFrom] = useState(initialInterval.from);
-  const [to, setTo] = useState(initialInterval.to);
+  const [initial] = useState(initialRanges);
+  const [from, setFrom] = useState(initial.from);
+  const [to, setTo] = useState(initial.to);
+  const [compareFrom,setCompareFrom] = useState(initial.compareFrom);
+  const [compareTo,setCompareTo] = useState(initial.compareTo);
   const [callerId, setCallerId] = useState("all");
   const [closerId, setCloserId] = useState("all");
   const [type, setType] = useState<LeadTypeFilter>("all");
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
-  const invalidInterval = from > to;
-  const funnel = useQuery({
-    ...trpc.dashboard.conversionFunnel.queryOptions({
-      from,
-      to,
-      callerId: callerId === "all" ? undefined : callerId,
-      closerId: closerId === "all" ? undefined : closerId,
-      type: type === "all" ? undefined : type,
-    }),
-    enabled: !invalidInterval,
-    placeholderData: keepPreviousData,
-  });
+  const invalidInterval = !validFunnelRange(from,to) || !validFunnelRange(compareFrom,compareTo);
+  const filters = { callerId: callerId === "all" ? undefined : callerId, closerId: closerId === "all" ? undefined : closerId, type: type === "all" ? undefined : type };
+  const [funnel,comparison] = useQueries({ queries: [
+    { ...trpc.dashboard.conversionFunnel.queryOptions({from,to,...filters}), enabled: !invalidInterval },
+    { ...trpc.dashboard.conversionFunnel.queryOptions({from:compareFrom,to:compareTo,...filters}), enabled: !invalidInterval },
+  ] });
   const selected = funnel.data?.stages.find((stage) => stage.key === selectedStage);
 
   return (
@@ -235,18 +236,24 @@ export function ConversionFunnel() {
             </Field>
           </FieldGroup>
 
+          <FieldGroup className="grid gap-3 sm:grid-cols-2" aria-label="Intervalo de comparación">
+            <Field invalid={invalidInterval}><FieldLabel htmlFor="funnel-compare-from">Comparación: desde</FieldLabel><Input id="funnel-compare-from" type="date" value={compareFrom} max={compareTo} onChange={e=>setCompareFrom(e.target.value)} /></Field>
+            <Field invalid={invalidInterval}><FieldLabel htmlFor="funnel-compare-to">Comparación: hasta</FieldLabel><Input id="funnel-compare-to" type="date" value={compareTo} min={compareFrom} onChange={e=>setCompareTo(e.target.value)} /></Field>
+          </FieldGroup>
+          <p className="text-xs text-muted-foreground">Mismas condiciones de caller, closer y tipo en ambos intervalos. Fechas de asignación en Europe/Madrid; los periodos pueden tener distinta duración y madurez.</p>
           {invalidInterval ? (
             <Empty heading="Corrige el intervalo de fechas" />
-          ) : funnel.isPending ? (
+          ) : funnel.isPending || comparison.isPending ? (
             <div className="grid gap-2 md:grid-cols-5" aria-label="Cargando embudo">
               {Array.from({ length: 5 }, (_, index) => (
                 <Skeleton key={index} className="h-20 w-full" />
               ))}
             </div>
-          ) : funnel.isError ? (
+          ) : funnel.isError || comparison.isError ? (
             <Empty heading="No se pudo cargar el embudo" />
-          ) : funnel.data ? (
+          ) : funnel.data && comparison.data ? (
             <>
+              <div><p className="text-lg font-semibold">Número de leads de la cohorte: {funnel.data.leadCount}</p><Comparison primary={funnel.data.leadCount} reference={comparison.data.leadCount} /></div>
               <ol className="grid items-stretch gap-2 md:grid-cols-5" aria-label="Etapas del embudo">
                 {funnel.data.stages.map((stage, index) => (
                   <li
@@ -267,6 +274,7 @@ export function ConversionFunnel() {
                             ? "Base de la cohorte"
                             : `${stage.previousConversion}% desde la etapa anterior`}
                         </CardDescription>
+                        <Comparison primary={stage.count} reference={comparison.data.stages.find(item=>item.key===stage.key)?.count ?? 0} />
                         <CardAction>
                           <Button
                             variant="outline"
@@ -290,6 +298,7 @@ export function ConversionFunnel() {
                   <p className="text-2xl font-semibold tabular-nums">
                     {funnel.data.totalConversion}%
                   </p>
+                  <p className="text-xs">Intervalo comparado: {comparison.data.totalConversion}% · Diferencia: {Math.round((funnel.data.totalConversion-comparison.data.totalConversion)*10)/10} puntos porcentuales</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Badge variant="outline">No-show: {funnel.data.exits.noShow}</Badge>

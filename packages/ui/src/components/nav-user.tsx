@@ -25,12 +25,14 @@ import { EllipsisVerticalIcon, CircleUserRoundIcon, CreditCardIcon, BellIcon, Lo
 export function NavUser({
   user,
   onSignOut,
+  onAccount,
 }: {
   user: {
     name: string
     email: string
     avatar: string
   }
+  onAccount?: () => void
   onSignOut?: () => void
 }) {
   const { isMobile } = useSidebar()
@@ -79,10 +81,10 @@ export function NavUser({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={onAccount}>
                 <CircleUserRoundIcon
                 />
-                Account
+                Mi perfil
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <CreditCardIcon

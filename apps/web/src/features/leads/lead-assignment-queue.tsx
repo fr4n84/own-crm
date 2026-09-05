@@ -38,6 +38,7 @@ import {
   SelectValue,
 } from "@crm-fran/ui/components/select";
 import { Skeleton } from "@crm-fran/ui/components/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@crm-fran/ui/components/tooltip";
 import {
   Tabs,
   TabsContent,
@@ -47,6 +48,7 @@ import {
 
 import AssignLeadButton from "@/components/assign-lead-button";
 import AssignLeadDrawer, { type Lead } from "@/features/leads/assign-lead-drawer";
+import LeadViewDrawer from "@/features/leads/lead-view-drawer";
 import { createLeadColumns } from "@/features/table/columns";
 import { splitDiscardedLeads } from "@/features/leads/lead-pool";
 import { useTrpcMutationWithToast } from "@/lib/use-trpc-mutation-with-toast";
@@ -90,6 +92,7 @@ export function LeadAssignmentQueue({
   const availableColumns = createLeadColumns(
     (lead) => (
       <div className="flex items-center gap-2">
+        <LeadViewDrawer lead={lead} triggerAriaLabel={`Ver detalles de ${lead.name}`} />
         <LeadTypeSelect
           leadId={lead.id}
           type={lead.type}
@@ -103,6 +106,7 @@ export function LeadAssignmentQueue({
   const recoveredColumns = createLeadColumns(
     (lead) => (
       <div className="flex items-center gap-2">
+        <LeadViewDrawer lead={lead} triggerAriaLabel={`Ver detalles de ${lead.name}`} />
         <LeadTypeSelect
           leadId={lead.id}
           type={lead.type}
@@ -113,14 +117,12 @@ export function LeadAssignmentQueue({
     ),
     { variant: "available", showRecoveryProgress: true },
   );
-  const discardedColumns = createLeadColumns(() => null, {
+  const discardedColumns = createLeadColumns((lead) => <LeadViewDrawer lead={lead} triggerAriaLabel={`Ver detalles de ${lead.name}`} />, {
     variant: "available",
     showRecoveryProgress: true,
-    readOnly: true,
   });
-  const wrongNumberColumns = createLeadColumns(() => null, {
+  const wrongNumberColumns = createLeadColumns((lead) => <LeadViewDrawer lead={lead} triggerAriaLabel={`Ver detalles de ${lead.name}`} />, {
     variant: "available",
-    readOnly: true,
   });
   const discardedGroups = splitDiscardedLeads(discardedLeads.data ?? []);
   const isVsl = type === "vsl";
@@ -397,14 +399,12 @@ function AssignLeadDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          <Button variant="outline" aria-label="Asignarme este lead">
+      <Tooltip><TooltipTrigger render={<DialogTrigger
+        render={<Button variant="outline" aria-label="Asignarme este lead">
             <UserRoundPlus data-icon="inline-start" />
-            Asignarme
-          </Button>
-        }
-      />
+            <span className="max-md:sr-only">Asignarme</span>
+          </Button>}
+      />}><span className="sr-only">Asignarme este lead</span></TooltipTrigger><TooltipContent>Asignarme este lead</TooltipContent></Tooltip>
       <DialogContent className="dashboard-arc-theme sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Confirmar asignación</DialogTitle>

@@ -5,6 +5,7 @@ import {
   filterAgendaLeadsByCloser,
   filterAgendaLeadsByCloserOutcome,
   filterAgendaLeadsByDateRange,
+  filterAgendaLeadsByName,
   formatLocalDate,
   getAgendaClosers,
   type AgendaQuestion,
@@ -153,11 +154,11 @@ describe("agenda lead helpers", () => {
         { questionKey: "callerOutcome", answer: "Agenda", authorRole: "caller" },
         { questionKey: "closerOutcome", answer: "Seguimiento", authorRole: "closer" },
         { questionKey: "closerFeedback", answer: "Texto libre", authorRole: "closer" },
-        { questionKey: "closerOutcome", answer: "Venta", authorRole: "closer" },
+        { questionKey: "closerOutcome", answer: "Reagenda", authorRole: "closer" },
       ]),
     ]);
 
-    expect(agenda?.closerOutcome).toBe("Venta");
+    expect(agenda?.closerOutcome).toBe("Reagenda");
     expect(agenda?.closerOutcome).not.toBe("Texto libre");
   });
 
@@ -190,5 +191,27 @@ describe("agenda lead helpers", () => {
       { id: "lead-3" },
     ]);
     expect(filterAgendaLeadsByCloserOutcome(agendas, "all")).toHaveLength(3);
+  });
+
+  it("removes sold leads from the active agenda without deleting their data", () => {
+    const [agenda] = filterAgendaLeads([
+      lead([
+        { questionKey: "callerOutcome", answer: "Agenda", authorRole: "caller" },
+        { questionKey: "closerOutcome", answer: "Venta", authorRole: "closer" },
+      ]),
+    ]);
+
+    expect(agenda).toBeUndefined();
+  });
+
+  it("searches by lead name without case or accent sensitivity", () => {
+    const agendas = filterAgendaLeads([
+      { ...lead([{ questionKey: "callerOutcome", answer: "Agenda", authorRole: "caller" }]), name: "Álvaro Pérez" },
+      { ...lead([{ questionKey: "callerOutcome", answer: "Agenda", authorRole: "caller" }]), id: "lead-2", name: "Beatriz" },
+    ]);
+
+    expect(filterAgendaLeadsByName(agendas, "alvaro")).toMatchObject([
+      { id: "lead-1", name: "Álvaro Pérez" },
+    ]);
   });
 });

@@ -14,6 +14,10 @@ describe("hasPermission", () => {
       );
     });
 
+    it("keeps global administrators able to modify closer sales", () => {
+      expect(hasPermission(["*"], ["sales:write"])).toBe(true);
+    });
+
     it("grants access even when required list is empty if user has '*'", () => {
       expect(hasPermission(["*"], [])).toBe(true);
     });

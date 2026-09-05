@@ -42,10 +42,10 @@ export const dashboardSummaryInput = z
     }
   });
 
-const conversionFunnelInput = z
+export const conversionFunnelInput = z
   .object({
-    from: date,
-    to: date,
+    from: calendarDay,
+    to: calendarDay,
     callerId: z.string().min(1).optional(),
     closerId: z.string().min(1).optional(),
     type: z.enum(["maestra", "vsl"]).optional(),

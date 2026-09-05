@@ -92,6 +92,9 @@ export function filterAgendaLeads(
     );
     if (outcome !== "Agenda") return [];
 
+    const closerOutcome = getLatestCloserOutcome(lead.questions);
+    if (closerOutcome === "Venta") return [];
+
     return [
       {
         ...lead,
@@ -101,10 +104,29 @@ export function filterAgendaLeads(
         scheduledTime:
           getLatestAgendaQuestionAnswer(lead.questions, "scheduledTime") ??
           "Sin asignar",
-        closerOutcome: getLatestCloserOutcome(lead.questions),
+        closerOutcome,
       },
     ];
   });
+}
+
+function normalizeSearchText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("es")
+    .trim();
+}
+
+export function filterAgendaLeadsByName(
+  leads: readonly AgendaLead[],
+  search: string,
+): AgendaLead[] {
+  const normalizedSearch = normalizeSearchText(search);
+  if (!normalizedSearch) return [...leads];
+  return leads.filter((lead) =>
+    normalizeSearchText(lead.name).includes(normalizedSearch),
+  );
 }
 
 export function filterAgendaLeadsByCloserOutcome(

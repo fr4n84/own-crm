@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { UserRoundPlus } from "lucide-react";
 import { Button } from "@crm-fran/ui/components/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@crm-fran/ui/components/tooltip";
 
 import { authClient } from "@/lib/auth-client";
 import { usePermissionState } from "@crm-fran/ui/permissions";
@@ -10,6 +11,7 @@ import { usePermissionState } from "@crm-fran/ui/permissions";
 import LeadDrawer from "@/components/lead-drawer/lead-drawer";
 import AssignLeadForm from "./assign-lead-form";
 import CloserQAForm from "./closer-qa-form";
+import { canOpenCloserFeedback } from "@crm-fran/api/leads/services/closer-answer-policy";
 
 // ── Public types ─────────────────────────────────────────────────────────────
 
@@ -112,15 +114,16 @@ export default function AssignLeadDrawer({
 			setBusinessCompleted(true);
 			void completeRecommendation();
 		};
-    const showsCloserFeedback =
-      role === "role-closer" || (isAgendaFeedback && (role === "role-admin" || isAssignedCloser));
+    const hasCloserWork = canOpenCloserFeedback(lead.questions);
+    const showsCloserWorkspace = role === "role-closer" || (isAgendaFeedback && (role === "role-admin" || isAssignedCloser));
+    const showsCloserFeedback = showsCloserWorkspace && hasCloserWork;
     const showsCallerActions =
       !isAgendaFeedback && (role === "role-caller" || role === "role-admin");
 
     // El id del form que el botón Guardar del drawer debe disparar.
     const submitFormId = showsCloserFeedback
       ? "closer-qa-form"
-      : "assign-lead-form";
+      : showsCallerActions ? "assign-lead-form" : undefined;
 
     const titleByRole: Record<DrawerRole, { title: string; description: string }> = {
         "role-caller": {
@@ -149,14 +152,14 @@ export default function AssignLeadDrawer({
           }
       : titleByRole[role];
 
-    if (isAgendaFeedback && !showsCloserFeedback) {
+    if (isAgendaFeedback && !showsCloserWorkspace) {
       return null;
     }
 
     return (
       <>
         {!hideTrigger && (
-          <Button
+          <Tooltip><TooltipTrigger render={<Button
             variant="outline"
             onClick={() => {
               if (businessCompleted) return;
@@ -166,10 +169,10 @@ export default function AssignLeadDrawer({
               void Promise.resolve(onOpen?.()).catch(() => undefined);
             }}
             aria-label={triggerLabel ?? "Abrir drawer"}
-          >
+          />}>
             <UserRoundPlus />
-            {triggerLabel}
-          </Button>
+            <span className="max-md:sr-only">{triggerLabel}</span>
+          </TooltipTrigger><TooltipContent>{triggerLabel ?? "Gestionar lead"}</TooltipContent></Tooltip>
         )}
 
         <LeadDrawer
@@ -178,6 +181,7 @@ export default function AssignLeadDrawer({
           title={title}
           description={description}
           type="edit"
+          presentation="dialog"
 		  submitFormId={businessCompleted ? undefined : submitFormId}
           submitLabel={
             showsCloserFeedback
@@ -197,6 +201,11 @@ export default function AssignLeadDrawer({
               onSubmitLabelChange={setCloserSubmitLabel}
             />
           )}
+
+          {!businessCompleted && showsCloserWorkspace && !hasCloserWork && <div className="flex flex-col gap-4">
+            <p className="rounded-lg border border-warning/40 bg-warning/10 p-4 text-sm" role="status">Este lead no tiene una agenda ni feedback pendiente del closer.</p>
+            <div><h3 className="font-medium">Feedback del caller</h3><div className="mt-2 flex flex-col gap-2">{lead.questions.filter((item) => item.authorRole === "caller" && item.answer.trim()).map((item, index) => <div key={`${item.questionKey ?? item.question}-${index}`} className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">{item.question}</p><p className="text-sm">{item.answer}</p></div>)}</div></div>
+          </div>}
 
 		  {!businessCompleted && showsCallerActions && (
             <AssignLeadForm

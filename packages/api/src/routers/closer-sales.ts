@@ -29,9 +29,29 @@ export const closerSaleUpdateInput = z.object({
   saleAmountCents: moneyCents,
   amountPaidCents: z.number().int().min(0).max(2_147_483_647),
   soldOn: calendarDay,
+  paymentMethod: z.enum(["fullpay", "financed"]).nullable().default(null),
+  financingProvider: z.string().trim().min(1).max(200).nullable().default(null),
+  installmentMonths: z.number().int().min(1).max(600).nullable().default(null),
   financialOperationId: z.uuid(),
   onboardingCompleted: z.boolean(),
   onboardingVideoUrl: nullableUrl,
+}).superRefine((value, context) => {
+  const isValidLegacy = value.paymentMethod === null
+    && value.financingProvider === null
+    && value.installmentMonths === null;
+  const isValidFullpay = value.paymentMethod === "fullpay"
+    && value.financingProvider === null
+    && value.installmentMonths === null;
+  const isValidFinanced = value.paymentMethod === "financed"
+    && value.financingProvider !== null
+    && value.installmentMonths !== null;
+  if (!isValidLegacy && !isValidFullpay && !isValidFinanced) {
+    context.addIssue({
+      code: "custom",
+      message: "La forma de pago y los datos de financiación no son coherentes",
+      path: ["paymentMethod"],
+    });
+  }
 }).refine((value) => value.amountPaidCents <= value.saleAmountCents, {
   message: "El importe cobrado no puede superar el importe de la venta",
   path: ["amountPaidCents"],

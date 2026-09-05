@@ -39,6 +39,7 @@ import {
   filterAgendaLeadsByCloser,
   filterAgendaLeadsByCloserOutcome,
   filterAgendaLeadsByDateRange,
+  filterAgendaLeadsByName,
   formatLocalDate,
   getAgendaClosers,
   type CloserOutcomeFilter,
@@ -62,6 +63,7 @@ export default function AgendasPage() {
 
 function AgendasPageContent() {
   const [closerFilter, setCloserFilter] = useState("all");
+  const [nameSearch, setNameSearch] = useState("");
   const [closerOutcomeFilter, setCloserOutcomeFilter] =
     useState<CloserOutcomeFilter>("all");
   const [dateRange, setDateRange] = useState({ from: "", to: "" });
@@ -89,7 +91,8 @@ function AgendasPageContent() {
 
   const agendaLeads = filterAgendaLeads(data ?? []);
   const closers = getAgendaClosers(agendaLeads);
-  const closerAgendaLeads = filterAgendaLeadsByCloser(agendaLeads, closerFilter);
+  const namedAgendaLeads = filterAgendaLeadsByName(agendaLeads, nameSearch);
+  const closerAgendaLeads = filterAgendaLeadsByCloser(namedAgendaLeads, closerFilter);
   const outcomeAgendaLeads = filterAgendaLeadsByCloserOutcome(
     closerAgendaLeads,
     closerOutcomeFilter,
@@ -103,6 +106,11 @@ function AgendasPageContent() {
   const tomorrowDate = new Date();
   tomorrowDate.setDate(tomorrowDate.getDate() + 1);
   const tomorrow = formatLocalDate(tomorrowDate);
+  const selectedCloser = closers.find((closer) => closer.id === closerFilter);
+  const closerItems = [
+    { value: "all", label: "Todos los closers" },
+    ...closers.map((closer) => ({ value: closer.id, label: closer.name })),
+  ];
 
   const selectQuickDate = (date: string) => {
     setDateRange({ from: date, to: date });
@@ -149,14 +157,25 @@ function AgendasPageContent() {
         <CardHeader>
           <CardTitle>Filtros</CardTitle>
           <CardDescription>
-            Combina el closer con un intervalo de fechas o usa un acceso rápido.
+            Busca por nombre y combina el closer con un intervalo de fechas.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <FieldGroup className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <FieldGroup className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+            <Field>
+              <FieldLabel htmlFor="agenda-name-search">Nombre</FieldLabel>
+              <Input
+                id="agenda-name-search"
+                type="search"
+                value={nameSearch}
+                placeholder="Buscar lead"
+                onChange={(event) => setNameSearch(event.target.value)}
+              />
+            </Field>
             <Field>
               <FieldLabel htmlFor="agenda-closer">Closer</FieldLabel>
               <Select
+                items={closerItems}
                 value={closerFilter}
                 onValueChange={(value) => setCloserFilter(value ?? "all")}
               >
@@ -164,7 +183,11 @@ function AgendasPageContent() {
                   id="agenda-closer"
                   aria-label="Filtrar por closer"
                 >
-                  <SelectValue placeholder="Todos los closers" />
+                  <SelectValue>
+                    {closerFilter === "all"
+                      ? "Todos los closers"
+                      : selectedCloser?.name ?? "Closer no disponible"}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent className={styles.overlayTheme}>
                   <SelectGroup>

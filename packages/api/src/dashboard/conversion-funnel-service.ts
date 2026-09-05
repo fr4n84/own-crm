@@ -1,3 +1,4 @@
+import { inclusiveMadridCalendarRange } from "../commercial-observatory/domain";
 import { alias, and, asc, db, eq, gte, inArray, lte } from "@crm-fran/db";
 import {
   leadActivityEvents,
@@ -23,22 +24,10 @@ export type ConversionFunnelInput = {
   type?: LeadType;
 };
 
-function startOfDay(value: string) {
-  const [year, month, day] = value.split("-").map(Number);
-  return new Date(year ?? 0, (month ?? 1) - 1, day ?? 1);
-}
-
-function endOfDay(value: string) {
-  const date = startOfDay(value);
-  date.setHours(23, 59, 59, 999);
-  return date;
-}
-
 export async function getConversionFunnel(input: ConversionFunnelInput) {
   const caller = alias(user, "funnel_caller");
   const closer = alias(user, "funnel_closer");
-  const from = startOfDay(input.from);
-  const to = endOfDay(input.to);
+  const { from, to } = inclusiveMadridCalendarRange(input.from, input.to);
   const conditions = [
     eq(leadActivityEvents.kind, LEAD_ACTIVITY_KIND.CALLER_ASSIGNED),
     gte(leadActivityEvents.occurredAt, from),

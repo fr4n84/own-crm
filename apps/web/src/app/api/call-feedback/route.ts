@@ -59,12 +59,14 @@ export async function POST(request: NextRequest) {
   const audio = formData.get("audio");
   const leadId = formData.get("leadId");
   const durationValue = formData.get("durationMs");
+  const feedbackRole = formData.get("feedbackRole");
   const durationMs =
     typeof durationValue === "string" ? Number(durationValue) : Number.NaN;
 
   if (!isUploadedFile(audio) || typeof leadId !== "string" || !leadId) {
     return errorResponse("Audio and leadId are required", 400);
   }
+  if (feedbackRole !== "caller" && feedbackRole !== "closer") return errorResponse("Invalid feedback role", 400);
   if (audio.size <= 0 || audio.size > MAX_AUDIO_BYTES) {
     return errorResponse("Invalid recording size", 413);
   }
@@ -87,6 +89,7 @@ export async function POST(request: NextRequest) {
       leadId,
       userId: context.session.user.id,
       permissions: context.permissions,
+      feedbackRole,
     });
     return Response.json(result);
   } catch (error) {

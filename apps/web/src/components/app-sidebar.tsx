@@ -4,27 +4,23 @@ import { usePathname, useRouter } from "next/navigation"
 import { AppSidebar as SharedAppSidebar } from "@crm-fran/ui/components/app-sidebar"
 import { authClient } from "@/lib/auth-client"
 import * as React from "react"
-import { useQuery } from "@tanstack/react-query"
-import { usePermissionState } from "@crm-fran/ui/permissions"
+import { useAppAccess } from "./app-access"
 
-import { trpc } from "@/utils/trpc"
+
+import { queryClient } from "@/utils/trpc"
 
 export function AppSidebar(props: React.ComponentProps<typeof SharedAppSidebar>) {
     const pathname = usePathname()
     const router = useRouter()
 
     const { data: session } = authClient.useSession()
-    const permissionState = usePermissionState()
-    const navigationVisibility = useQuery({
-        ...trpc.users.navigationVisibility.queryOptions(),
-        enabled: permissionState.isLoaded && Boolean(permissionState.role),
-        retry: false,
-    })
+    const access = useAppAccess()
 
     const handleSignOut = async () => {
         await authClient.signOut({
             fetchOptions: {
                 onSuccess: () => {
+                    queryClient.clear()
                     router.push("/login")
                 }
             }
@@ -42,8 +38,9 @@ export function AppSidebar(props: React.ComponentProps<typeof SharedAppSidebar>)
             LinkComponent={Link}
             currentPathname={pathname}
             user={currentUser}
+            onAccount={() => router.push("/perfil")}
             onSignOut={handleSignOut}
-            navigationVisibility={navigationVisibility.data?.configured ? { roleIdsByModule: navigationVisibility.data.roleIdsByModule } : undefined}
+            navigationVisibility={access.navigation}
             {...props}
         />
     )

@@ -77,7 +77,7 @@ describe("weekly decision center domain", () => {
   });
 
   it("freezes only quality thresholds and omits audit metadata", () => {
-    expect(freezeQualityThresholds({
+    const settings = {
       id: "global",
       callerAbandonedHours: 24,
       closerAbandonedHours: 48,
@@ -87,7 +87,8 @@ describe("weekly decision center domain", () => {
       closerLowConversionPercent: 25,
       updatedById: "admin",
       updatedAt: new Date(),
-    })).toEqual({
+    };
+    expect(freezeQualityThresholds(settings)).toEqual({
       callerAbandonedHours: 24,
       closerAbandonedHours: 48,
       callerFollowUpGraceHours: 1,

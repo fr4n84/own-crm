@@ -13,12 +13,13 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@crm-fran/ui/components/sidebar"
-import { CircleAlertIcon, HouseIcon, ChartBarIcon, CalendarDaysIcon, ChartNoAxesCombinedIcon, CameraIcon, FileTextIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon, MessageSquareIcon, ListChecksIcon, BadgeEuroIcon, GoalIcon, ChartSplineIcon, UsersIcon, HandshakeIcon, MessageCircleIcon } from "lucide-react"
+import { CircleAlertIcon, HouseIcon, ChartBarIcon, CalendarDaysIcon, ChartNoAxesCombinedIcon, CameraIcon, FileTextIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon, MessageSquareIcon, ListChecksIcon, BadgeEuroIcon, GoalIcon, ChartSplineIcon, UsersIcon, HandshakeIcon, MessageCircleIcon, LightbulbIcon } from "lucide-react"
 import { usePermissions, useRole } from "@crm-fran/ui/permissions"
 import type { Permission } from "@crm-fran/db/schema/auth"
 import {
   canAccessNavigationItem,
   canViewConfiguredNavigationItem,
+  presentNavigationForRole,
   PRIMARY_NAVIGATION_ITEMS,
   type NavigationVisibilityConfiguration,
   type PrimaryNavigationItem,
@@ -148,6 +149,7 @@ export function AppSidebar({
   currentPathname,
   user,
   onSignOut,
+  onAccount,
   navigationVisibility,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
@@ -158,6 +160,7 @@ export function AppSidebar({
     email: string
     avatar: string
   }
+  onAccount?: () => void
   onSignOut?: () => void
   navigationVisibility?: NavigationVisibilityConfiguration
 }) {
@@ -180,8 +183,8 @@ export function AppSidebar({
       </SidebarHeader>
       <SidebarContent>
         <NavMain
-          items={data.navMain
-            .filter((item) => canViewConfiguredNavigationItem(item, role?.id, permissions, navigationVisibility))
+          items={presentNavigationForRole(data.navMain
+            .filter((item) => canViewConfiguredNavigationItem(item, role?.id, permissions, navigationVisibility)), role?.id)
             .map((item) => item.url === "/observatorio-comercial" ? { ...item, url: observatoryNavigationUrl(permissions) } : item)}
           LinkComponent={LinkComponent}
           currentPathname={currentPathname}
@@ -189,7 +192,14 @@ export function AppSidebar({
         {/* <NavDocuments items={data.documents} /> */}
       </SidebarContent>
       {user ? <SidebarFooter>
-        <NavUser user={user} onSignOut={onSignOut} />
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton tooltip="Sugerencias" render={<LinkComponent href="/sugerencias" />} className="text-sm">
+              <LightbulbIcon /><span>Sugerencias</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+        <NavUser user={user} onSignOut={onSignOut} onAccount={onAccount} />
       </SidebarFooter> : null}
     </Sidebar>
   )

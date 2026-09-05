@@ -10,7 +10,8 @@
     }
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "check-types": "tsc --noEmit --composite false --incremental false"
   },
   "dependencies": {
     "@crm-fran/auth": "workspace:*",

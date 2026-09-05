@@ -1,4 +1,4 @@
-import { and, asc, db, eq, gte, lt } from "@crm-fran/db";
+import { asc, db, eq, gte, lt } from "@crm-fran/db";
 import {
   leads,
   rankingEvents,

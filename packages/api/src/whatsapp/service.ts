@@ -1,4 +1,4 @@
-import { and, asc, db, desc, eq, gte, inArray, isNotNull, isNull, lt, ne } from "@crm-fran/db";
+import { and, asc, db, desc, eq, gte, inArray, isNotNull, isNull, lt, ne, sql } from "@crm-fran/db";
 import { CALLER_ROLE_IDS, LEAD_POOL_STATUS, LEAD_STATE, leads, user } from "@crm-fran/db/schema/index";
 import { TRPCError } from "@trpc/server";
 
@@ -22,7 +22,8 @@ export async function listWhatsappQueue(input: {
   const statusCondition = input.status === "sent"
     ? isNotNull(leads.whatsappSentAt)
     : isNull(leads.whatsappSentAt);
-  const callerCondition = input.callerId ? eq(leads.callerId, input.callerId) : undefined;
+  const attributedCallerId = sql<string | null>`coalesce(${leads.whatsappCallerId}, ${leads.callerId})`;
+  const callerCondition = input.callerId ? eq(attributedCallerId, input.callerId) : undefined;
 
   const [rows, callers] = await Promise.all([
     db.select({
@@ -34,7 +35,7 @@ export async function listWhatsappQueue(input: {
       whatsappSentAt: leads.whatsappSentAt,
     })
       .from(leads)
-      .leftJoin(user, eq(user.id, leads.callerId))
+      .leftJoin(user, eq(user.id, attributedCallerId))
       .where(and(
         eq(leads.poolStatus, LEAD_POOL_STATUS.DISCARDED),
         gte(leads.noContactImpactCount, 3),

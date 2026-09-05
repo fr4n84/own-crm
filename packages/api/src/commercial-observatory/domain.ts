@@ -89,6 +89,11 @@ function madridMidnight(dayKey: string) {
   return new Date(guess);
 }
 
+export function inclusiveMadridCalendarRange(fromDay: string, toDay: string) {
+  if (!isCalendarDayKey(fromDay) || !isCalendarDayKey(toDay) || fromDay > toDay) throw new RangeError("Invalid calendar range");
+  return { from: madridMidnight(fromDay), to: new Date(madridMidnight(ordinalKey(dateOrdinal(toDay) + 1)).getTime() - 1) };
+}
+
 export function normalizeMadridRange(input: { fromDay: string; toDay: string; now: Date }) {
   if (!isCalendarDayKey(input.fromDay) || !isCalendarDayKey(input.toDay) || input.fromDay > input.toDay) throw new RangeError("Invalid calendar range");
   const today = madridDayKey(input.now);

@@ -422,7 +422,7 @@ function endOfDay(value: string) {
   return date;
 }
 
-export async function getFeedbackStatistics(input: FeedbackStatisticsInput) {
+export async function getFeedbackStatistics(input: FeedbackStatisticsInput, actorScope?: string) {
   const rankingCaller = alias(user, "feedback_ranking_caller");
   const rankingCloser = alias(user, "feedback_ranking_closer");
   const legacyCaller = alias(user, "feedback_legacy_caller");
@@ -445,6 +445,7 @@ export async function getFeedbackStatistics(input: FeedbackStatisticsInput) {
     .innerJoin(leads, eq(leadActivityEvents.leadId, leads.id))
     .where(and(
       eq(leadActivityEvents.kind, "caller_feedback"),
+      actorScope ? eq(leadActivityEvents.actorId, actorScope) : undefined,
       input.from ? gte(leadActivityEvents.occurredAt, startOfDay(input.from)) : undefined,
       input.to ? lte(leadActivityEvents.occurredAt, endOfDay(input.to)) : undefined,
     ))
@@ -464,6 +465,7 @@ export async function getFeedbackStatistics(input: FeedbackStatisticsInput) {
       })
       .from(leads)
       .where(and(
+        actorScope ? eq(leads.callerId, actorScope) : undefined,
         input.from ? gte(leads.createdAt, startOfDay(input.from)) : undefined,
         input.to ? lte(leads.createdAt, endOfDay(input.to)) : undefined,
       )),
@@ -488,6 +490,7 @@ export async function getFeedbackStatistics(input: FeedbackStatisticsInput) {
       .leftJoin(rankingCloser, eq(rankingCloser.id, leads.closerId))
       .where(and(
         eq(leadActivityEvents.kind, LEAD_ACTIVITY_KIND.CALLER_ASSIGNED),
+        actorScope ? eq(leadActivityEvents.actorId, actorScope) : undefined,
         input.from ? gte(leadActivityEvents.occurredAt, startOfDay(input.from)) : undefined,
         input.to ? lte(leadActivityEvents.occurredAt, endOfDay(input.to)) : undefined,
         input.source ? eq(leads.source, input.source) : undefined,
@@ -509,6 +512,7 @@ export async function getFeedbackStatistics(input: FeedbackStatisticsInput) {
       .from(leads)
       .leftJoin(legacyCaller, eq(legacyCaller.id, leads.callerId))
       .where(and(
+        actorScope ? eq(leads.callerId, actorScope) : undefined,
         input.from ? gte(leads.createdAt, startOfDay(input.from)) : undefined,
         input.to ? lte(leads.createdAt, endOfDay(input.to)) : undefined,
       )),

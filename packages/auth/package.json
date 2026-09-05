@@ -9,7 +9,9 @@
       "default": "./src/*.ts"
     }
   },
-  "scripts": {},
+  "scripts": {
+    "check-types": "tsc --noEmit --composite false --incremental false"
+  },
   "dependencies": {
     "@crm-fran/db": "workspace:*",
     "@crm-fran/env": "workspace:*",

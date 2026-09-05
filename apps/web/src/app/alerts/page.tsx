@@ -46,6 +46,7 @@ import {
   ALERT_TYPE_LABELS,
   filterAlertsByType,
 } from "@/features/alerts/alert-type";
+import { getAlertSeverityLabel } from "@/features/alerts/alert-labels";
 import {
   useAlerts,
   useAlertPreferences,
@@ -167,11 +168,7 @@ export function AlertsInbox() {
             <SelectValue>
               {severityFilter === "all"
                 ? "Toda relevancia"
-                : severityFilter === "urgent"
-                  ? "Alta"
-                  : severityFilter === "warning"
-                    ? "Media"
-                    : "Baja"}
+                : getAlertSeverityLabel(severityFilter)}
             </SelectValue>
           </SelectTrigger>
           <SelectContent className={styles.overlayTheme}>

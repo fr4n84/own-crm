@@ -1,3 +1,5 @@
+import { isQuarterHourTime, QUARTER_HOUR_MESSAGE } from "../../scheduling/time-slot";
+
 export type CallerOutcome =
   | "future_call"
   | "not_fit"
@@ -202,6 +204,7 @@ export function validateCallerOutcomeInput(
   if (input.outcome === "future_call" || input.outcome === "appointment") {
     if (!input.scheduledDate) errors.scheduledDate = "Required";
     if (!input.scheduledTime) errors.scheduledTime = "Required";
+    else if (!isQuarterHourTime(input.scheduledTime)) errors.scheduledTime = QUARTER_HOUR_MESSAGE;
 
     if (input.scheduledDate && input.scheduledTime) {
       const scheduledAt = getScheduledAt(

@@ -219,4 +219,22 @@ describe("CloserQAForm — integración con el drawer", () => {
       "No interesado",
     );
   });
+
+  it("offers an optional free-text product with existing suggestions", () => {
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CloserQAForm
+          leadId="lead-1"
+          leadQuestions={[
+            { questionKey: "isContacted", question: "Contacto", answer: "Si", authorRole: "closer", authorId: "closer-1" },
+            { questionKey: "closerOutcome", question: "Resultado", answer: "Venta", authorRole: "closer", authorId: "closer-1" },
+          ]}
+        />
+      </QueryClientProvider>,
+    );
+
+    const product = screen.getByLabelText("Producto recomendado");
+    expect(product).toHaveAttribute("list", "closer-product-suggestions");
+    expect(product.tagName).toBe("INPUT");
+  });
 });

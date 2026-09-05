@@ -21,6 +21,7 @@ const ROUTE_MAP: Record<string, string> = {
     "/tickets": "Tickets",
     "/login": "Iniciar Sesión",
     "/signup": "Registrarse",
+    "/sugerencias": "Sugerencias",
 }
 export function ActiveTitle() {
     const pathname = usePathname()

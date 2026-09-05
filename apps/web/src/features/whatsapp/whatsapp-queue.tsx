@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@crm-fran/ui/components/card";
@@ -47,6 +47,10 @@ export function WhatsappQueue() {
   const [from, setFrom] = useState(defaultFrom);
   const [to, setTo] = useState(() => dayKey(new Date()));
   const [callerId, setCallerId] = useState("all");
+  const [optimisticSent, setOptimisticSent] = useState<Record<string, boolean>>({});
+  const [confirmation, setConfirmation] = useState("");
+  const removalTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => () => removalTimers.current.forEach(clearTimeout), []);
   const input = {
     status,
     from,
@@ -55,11 +59,31 @@ export function WhatsappQueue() {
   };
   const queue = useQuery(trpc.whatsapp.list.queryOptions(input));
   const markSent = useMutation(trpc.whatsapp.markSent.mutationOptions({
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: trpc.whatsapp.list.queryKey() });
-      toast.success(status === "pending" ? "Marcado como enviado" : "Devuelto a pendientes");
+    onMutate: ({ leadId, sent }) => {
+      setOptimisticSent((current) => ({ ...current, [leadId]: sent }));
     },
-    onError: (error) => toast.error(error.message),
+    onSuccess: (_result, { leadId, sent }) => {
+      const message = sent ? "Marcado como enviado" : "Devuelto a pendientes";
+      setConfirmation(message);
+      toast.success(message);
+      removalTimers.current.push(setTimeout(() => {
+        void queryClient.invalidateQueries({ queryKey: trpc.whatsapp.list.queryKey() });
+        setOptimisticSent((current) => {
+          const next = { ...current };
+          delete next[leadId];
+          return next;
+        });
+      }, 1_200));
+    },
+    onError: (error, { leadId }) => {
+      setOptimisticSent((current) => {
+        const next = { ...current };
+        delete next[leadId];
+        return next;
+      });
+      setConfirmation("No se pudo actualizar el envío");
+      toast.error(error.message);
+    },
   }));
   const rows = queue.data?.rows ?? [];
   const callers = queue.data?.callers ?? [];
@@ -70,18 +94,19 @@ export function WhatsappQueue() {
       ? <Empty heading={status === "pending" ? "No quedan envíos pendientes" : "No hay envíos en este intervalo"} description="Prueba con otro intervalo o caller." />
       : <>
           <div className="grid gap-2 md:hidden">
-            {rows.map((row) => <QueueCard key={row.id} row={row} disabled={!canMarkSent || markSent.isPending} onChange={(sent) => markSent.mutate({ leadId: row.id, sent })} />)}
+            {rows.map((row) => <QueueCard key={row.id} row={{ ...row, whatsappSentAt: optimisticSent[row.id] ?? row.whatsappSentAt !== null ? row.whatsappSentAt ?? new Date().toISOString() : null }} disabled={!canMarkSent || markSent.isPending} onChange={(sent) => markSent.mutate({ leadId: row.id, sent })} />)}
           </div>
           <div className="hidden md:block">
             <Table>
               <TableHeader><TableRow><TableHead>Lead</TableHead><TableHead>Teléfono</TableHead><TableHead>Caller</TableHead><TableHead>Fecha</TableHead><TableHead className="w-24 text-center">Enviado</TableHead></TableRow></TableHeader>
-              <TableBody>{rows.map((row) => <TableRow key={row.id}><TableCell className="font-medium">{row.name}</TableCell><TableCell>{row.phone}</TableCell><TableCell>{row.caller?.name ?? "Sin caller"}</TableCell><TableCell>{new Date(row.queueDate!).toLocaleDateString("es-ES")}</TableCell><TableCell className="text-center"><Checkbox aria-label={`Marcar ${row.name} como enviado`} checked={row.whatsappSentAt !== null} disabled={!canMarkSent || markSent.isPending} onCheckedChange={(sent) => markSent.mutate({ leadId: row.id, sent })} /></TableCell></TableRow>)}</TableBody>
+              <TableBody>{rows.map((row) => <TableRow key={row.id}><TableCell className="font-medium">{row.name}</TableCell><TableCell>{row.phone}</TableCell><TableCell>{row.caller?.name ?? "Sin caller"}</TableCell><TableCell>{new Date(row.queueDate!).toLocaleDateString("es-ES")}</TableCell><TableCell className="text-center"><Checkbox aria-label={`Marcar ${row.name} como enviado`} checked={optimisticSent[row.id] ?? row.whatsappSentAt !== null} disabled={!canMarkSent || markSent.isPending} onCheckedChange={(sent) => markSent.mutate({ leadId: row.id, sent })} /></TableCell></TableRow>)}</TableBody>
             </Table>
           </div>
         </>;
 
   return (
     <main className="flex w-full flex-col gap-4 p-4 md:p-6">
+      <p className="sr-only" aria-live="polite">{confirmation}</p>
       <header className="space-y-1">
         <div className="flex items-center gap-2"><div className="rounded-md bg-primary/10 p-2 text-primary"><CheckIcon className="size-4" /></div><h1 className="text-2xl font-semibold tracking-tight">WhatsApp</h1></div>
         <p className="text-sm text-muted-foreground">Leads con 3 impactos telefónicos sin contacto.</p>
@@ -119,5 +144,5 @@ function QueueCard(props: {
   disabled: boolean;
   onChange: (sent: boolean) => void;
 }) {
-  return <label className="flex min-h-16 items-center justify-between gap-3 rounded-lg border p-3"><span className="min-w-0"><span className="block truncate font-medium">{props.row.name}</span><span className="block text-xs text-muted-foreground">{props.row.phone} · {props.row.caller?.name ?? "Sin caller"} · {props.row.queueDate ? new Date(props.row.queueDate).toLocaleDateString("es-ES") : "—"}</span></span><Checkbox aria-label={`Marcar ${props.row.name} como enviado`} checked={props.row.whatsappSentAt !== null} disabled={props.disabled} onCheckedChange={props.onChange} /></label>;
+  return <label className="flex min-h-16 items-center justify-between gap-3 rounded-lg border p-3"><span className="min-w-0"><span className="block truncate font-medium">{props.row.name}</span><span className="block text-xs text-muted-foreground">{props.row.phone}</span></span><Checkbox aria-label={`Marcar ${props.row.name} como enviado`} checked={props.row.whatsappSentAt !== null} disabled={props.disabled} onCheckedChange={props.onChange} /></label>;
 }

@@ -29,15 +29,18 @@ function request({
   file = new NodeFile(["audio"], "call.webm", { type: "audio/webm" }),
   durationMs = "60000",
   contentLength = "1024",
+  feedbackRole = "caller",
 }: {
   file?: NodeFile;
   durationMs?: string;
   contentLength?: string;
+  feedbackRole?: string;
 } = {}) {
   const values = new Map<string, FormDataEntryValue>([
     ["audio", file as unknown as File],
     ["leadId", "lead-1"],
     ["durationMs", durationMs],
+    ["feedbackRole", feedbackRole],
   ]);
   const formData = {
     get: (key: string) => values.get(key) ?? null,
@@ -97,5 +100,13 @@ describe("POST /api/call-feedback", () => {
 
     mocks.process.mockRejectedValueOnce(new Error("provider failed"));
     expect((await POST(request())).status).toBe(502);
+  });
+
+  it("forwards an explicit feedback role and rejects unknown roles", async () => {
+    expect((await POST(request({ feedbackRole: "closer" }))).status).toBe(200);
+    expect(mocks.process).toHaveBeenCalledWith(expect.objectContaining({ feedbackRole: "closer" }));
+    mocks.process.mockClear();
+    expect((await POST(request({ feedbackRole: "admin" }))).status).toBe(400);
+    expect(mocks.process).not.toHaveBeenCalled();
   });
 });

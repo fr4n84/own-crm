@@ -80,4 +80,20 @@ describe("DateRangePicker", () => {
       to: undefined,
     });
   });
+  it("emits the real calendar day in the YYYY-MM-DD tRPC shape", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-09-04T10:00:00.000Z"));
+    const onChange = vi.fn();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const { container } = render(<DateRangePicker onChange={onChange} />);
+    const trigger = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Pick a date"));
+    if (!trigger) throw new Error("From-date trigger missing");
+    await user.click(trigger);
+    const expectedDay = new Date(2026, 8, 4).toLocaleDateString();
+    const day = Array.from(document.querySelectorAll("button[data-day]")).find((button) => button.getAttribute("data-day") === expectedDay);
+    if (!(day instanceof HTMLElement)) throw new Error("Real calendar day missing");
+    await user.click(day);
+    expect(onChange).toHaveBeenCalledWith({ from: "2026-09-04", to: undefined });
+    vi.useRealTimers();
+  });
 });

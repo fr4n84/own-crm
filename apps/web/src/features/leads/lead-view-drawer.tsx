@@ -5,6 +5,7 @@ import { Eye } from "lucide-react";
 import type { QASessionItem } from "@/app/types";
 import { CALLER_QUESTIONS, CLOSER_QUESTIONS } from "./qa-questions";
 import { Button } from "@crm-fran/ui/components/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@crm-fran/ui/components/tooltip";
 import { Input } from "@crm-fran/ui/components/input";
 import { Textarea } from "@crm-fran/ui/components/textarea";
 import {
@@ -21,6 +22,14 @@ export interface LeadDetailsData {
   id: string;
   questions: QASessionItem[];
   feedback?: string;
+  name?: string;
+  email?: string | null;
+  phone?: string;
+  state?: string;
+  caller?: { name: string } | null;
+  closer?: { name: string } | null;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
 }
 
 const QUESTIONS_BY_ROLE = {
@@ -71,14 +80,14 @@ export default function LeadViewDrawer({
 
   return (
     <>
-      <Button
+      <Tooltip><TooltipTrigger render={<Button
         variant={trigger ? "default" : "outline"}
         size={trigger ? "default" : "icon"}
         aria-label={triggerAriaLabel}
         onClick={() => setOpen(true)}
-      >
+      />}>
         {trigger ?? <Eye data-icon="inline-start" />}
-      </Button>
+      </TooltipTrigger><TooltipContent>{triggerAriaLabel ?? "Ver detalles del lead"}</TooltipContent></Tooltip>
 
       <LeadDrawer
         open={open}
@@ -86,6 +95,7 @@ export default function LeadViewDrawer({
         title="Información del lead"
         description="Datos registrados durante la llamada."
         type="view"
+        presentation="dialog"
       >
         <Tabs defaultValue="details" className="w-full">
           <TabsList className="w-full" variant="line">
@@ -97,6 +107,9 @@ export default function LeadViewDrawer({
             </TabsTrigger>
           </TabsList>
           <TabsContent value="details" className="pt-4">
+            <dl className="mb-6 grid gap-3 rounded-lg border p-4 sm:grid-cols-2 lg:grid-cols-3">
+              {[['Nombre', lead.name], ['Teléfono', lead.phone], ['Correo', lead.email], ['Estado', lead.state], ['Caller', lead.caller?.name], ['Closer', lead.closer?.name], ['Creado', lead.createdAt ? new Date(lead.createdAt).toLocaleString() : undefined], ['Actualizado', lead.updatedAt ? new Date(lead.updatedAt).toLocaleString() : undefined]].filter((item) => item[1]).map(([label, value]) => <div key={String(label)}><dt className="text-xs text-muted-foreground">{label}</dt><dd className="text-sm font-medium">{String(value)}</dd></div>)}
+            </dl>
             <ReadOnlyQAView
               callerAnswers={callerItems}
               closerAnswers={closerItems}
@@ -205,11 +218,14 @@ function ReadOnlySession({
 }) {
   const questions = QUESTIONS_BY_ROLE[role];
   const existingAnswers = buildAnswersMap(items);
+  const answeredQuestions = questions.filter((question) => Boolean(existingAnswers[question]?.trim()));
+
+  if (answeredQuestions.length === 0) return <p className="text-sm text-muted-foreground italic">{emptyMessage}</p>;
 
   return (
     <div className="space-y-4">
 
-      {questions.map((question) => {
+      {answeredQuestions.map((question) => {
         const answer = existingAnswers[question] ?? "";
         return (
           <div key={question} className="space-y-2">
@@ -222,9 +238,7 @@ function ReadOnlySession({
               />
             ) : answer ? (
               <Input value={answer} disabled />
-            ) : (
-              <p className="text-sm text-muted-foreground italic">{emptyMessage}</p>
-            )}
+            ) : null}
           </div>
         );
       })}

@@ -25,6 +25,7 @@ import {
 } from "@crm-fran/ui/components/select";
 
 import { useStartConversation } from "./use-messages";
+import { resolveEntityLabel } from "../leads/select-label";
 
 type MessageUser = { id: string; name: string; email: string; roleId: string };
 
@@ -57,7 +58,7 @@ export function NewConversationDialog({
             <FieldLabel>Usuario</FieldLabel>
             <Select value={participantId} onValueChange={(value) => setParticipantId(value ?? "")}>
               <SelectTrigger aria-label="Seleccionar usuario">
-                <SelectValue placeholder="Selecciona un usuario" />
+                <SelectValue>{participantId ? resolveEntityLabel(users, participantId, "Usuario no disponible", true) : "Selecciona un usuario"}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>

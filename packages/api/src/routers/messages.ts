@@ -229,22 +229,24 @@ export const messagesRouter = router({
     .input(sendMessageInputSchema)
     .mutation(async ({ ctx, input }) => {
       await getConversationForActor(input.conversationId, ctx.session.user.id);
-      const now = new Date();
-      const [message] = await db
-        .insert(messages)
-        .values({
-          id: crypto.randomUUID(),
-          conversationId: input.conversationId,
-          senderId: ctx.session.user.id,
-          kind: MESSAGE_KIND.MESSAGE,
-          body: input.body,
-        })
-        .returning();
-      await db
-        .update(conversations)
-        .set({ updatedAt: now })
-        .where(eq(conversations.id, input.conversationId));
-      return message;
+      return db.transaction(async (tx) => {
+        const now = new Date();
+        const [message] = await tx
+          .insert(messages)
+          .values({
+            id: crypto.randomUUID(),
+            conversationId: input.conversationId,
+            senderId: ctx.session.user.id,
+            kind: MESSAGE_KIND.MESSAGE,
+            body: input.body,
+          })
+          .returning();
+        await tx
+          .update(conversations)
+          .set({ updatedAt: now })
+          .where(eq(conversations.id, input.conversationId));
+        return message;
+      });
     }),
 
   sendTask: protectedProcedure
@@ -261,25 +263,27 @@ export const messagesRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid task assignee" });
       }
 
-      const now = new Date();
-      const [message] = await db
-        .insert(messages)
-        .values({
-          id: crypto.randomUUID(),
-          conversationId: input.conversationId,
-          senderId: ctx.session.user.id,
-          kind: MESSAGE_KIND.TASK,
-          body: input.description ?? "",
-          taskTitle: input.title,
-          taskAssigneeId: input.assigneeId,
-          taskDueAt: input.dueAt ? new Date(input.dueAt) : null,
-        })
-        .returning();
-      await db
-        .update(conversations)
-        .set({ updatedAt: now })
-        .where(eq(conversations.id, input.conversationId));
-      return message;
+      return db.transaction(async (tx) => {
+        const now = new Date();
+        const [message] = await tx
+          .insert(messages)
+          .values({
+            id: crypto.randomUUID(),
+            conversationId: input.conversationId,
+            senderId: ctx.session.user.id,
+            kind: MESSAGE_KIND.TASK,
+            body: input.description ?? "",
+            taskTitle: input.title,
+            taskAssigneeId: input.assigneeId,
+            taskDueAt: input.dueAt ? new Date(input.dueAt) : null,
+          })
+          .returning();
+        await tx
+          .update(conversations)
+          .set({ updatedAt: now })
+          .where(eq(conversations.id, input.conversationId));
+        return message;
+      });
     }),
 
   completeTask: protectedProcedure

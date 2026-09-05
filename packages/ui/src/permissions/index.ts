@@ -4,6 +4,7 @@
  * Import via:
  *   import {
  *     PermissionProvider,
+ *     ResolvedPermissionProvider,
  *     usePermissions,
  *     useRole,
  *     usePermissionState,
@@ -14,6 +15,7 @@
 
 export {
   PermissionProvider,
+  ResolvedPermissionProvider,
   usePermissionState,
   usePermissions,
   useRole,

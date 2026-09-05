@@ -11,15 +11,15 @@ function readWorkspaceFile(path: string) {
 }
 
 describe("Dashboard visual contract", () => {
-  it("places the compact visitors chart before the conversion funnel", () => {
+  it("removes redundant dashboard sections without deleting shared components", () => {
     const dashboard = readWorkspaceFile("src/components/dashboard.tsx");
     const summaryPosition = dashboard.indexOf("<DashboardSummaryCards />");
     const visitorsPosition = dashboard.indexOf("<ChartAreaInteractive />");
     const funnelPosition = dashboard.indexOf("<ConversionFunnel />");
 
-    expect(summaryPosition).toBeGreaterThan(-1);
-    expect(visitorsPosition).toBeGreaterThan(summaryPosition);
-    expect(visitorsPosition).toBeGreaterThan(-1);
+    expect(summaryPosition).toBe(-1);
+
+    expect(visitorsPosition).toBe(-1);
     expect(funnelPosition).toBeGreaterThan(visitorsPosition);
     expect(dashboard).toContain('className="dashboard-arc-theme');
 
@@ -69,6 +69,15 @@ describe("Dashboard visual contract", () => {
     expect(styles).toContain("--card: #fffcec");
     expect(styles).toContain("--accent: #fffadd");
     expect(styles).toContain("--border: #3139fb");
+  });
+
+  it("limits Arc light colors to light mode and uses semantic active navigation colors", () => {
+    const styles = readWorkspaceFile("src/index.css");
+    const navigation = readWorkspaceFile("../../packages/ui/src/components/nav-main.tsx");
+    expect(styles).toContain("html:not(.dark) .dashboard-arc-theme");
+    expect(styles).toContain("html:not(.dark) .commercial-observatory-arc-theme.dashboard-arc-theme");
+    expect(navigation).toContain("bg-sidebar-accent text-sidebar-accent-foreground");
+    expect(navigation).not.toContain("bg-blue-100 text-blue-700");
   });
 
   it("keeps portalled Dashboard controls inside the Arc visual scope", () => {

@@ -78,7 +78,7 @@ export function getAuthoritativeConversionMilestones(
 
 const STAGE_LABELS: Record<ConversionStage, string> = {
   assigned: "Asignados",
-  contacted: "Contactados",
+  contacted: "Respuesta",
   appointment: "Agenda",
   show: "Show",
   sale: "Venta",
@@ -214,6 +214,7 @@ export function buildConversionFunnel(input: readonly FunnelLead[]) {
 
   return {
     stages,
+    leadCount: assigned,
     exits,
     totalConversion:
       assigned === 0

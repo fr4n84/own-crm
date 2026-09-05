@@ -9,7 +9,7 @@ export const PRICING_VERSION = "openai-2026-08-20";
 export const MONTHLY_REFERENCE_MINUTES = 5_000;
 
 const nullableFormText = z.string().max(2_000);
-const transcriptText = z.string().max(100_000);
+export type FeedbackRole = "caller" | "closer";
 
 export const FEEDBACK_PROFILES = [
   { value: "latino_extranjero", label: "Latino/extranjero" },
@@ -101,7 +101,7 @@ export const callFeedbackDraftSchema = z
     trainingAndPriceAwareness: nullableFormText,
     urgencyReason: nullableFormText,
     summary: nullableFormText,
-    extraInfo: transcriptText,
+    extraInfo: nullableFormText,
     scheduledDate: z.union([z.literal(""), z.string().date()]),
     scheduledTime: z.union([
       z.literal(""),
@@ -112,6 +112,21 @@ export const callFeedbackDraftSchema = z
   .strict();
 
 export type CallFeedbackDraft = z.infer<typeof callFeedbackDraftSchema>;
+
+export const closerCallFeedbackDraftSchema = z.object({
+  isContacted: z.enum(["", "Si", "No"]),
+  closerOutcome: z.enum(["", "Agenda", "Reagenda", "Seguimiento", "Venta", "No interesado", "No-show"]),
+  closerFeedback: nullableFormText,
+  isDecisionMaker: z.enum(["", "Si", "No"]),
+  decisionMakerName: nullableFormText,
+  financialSource: nullableFormText,
+  productFit: nullableFormText,
+  urgencyReason: nullableFormText,
+  extraInfo: nullableFormText,
+  scheduledDate: z.union([z.literal(""), z.string().date()]),
+  scheduledTime: z.union([z.literal(""), z.string().regex(/^\d{2}:\d{2}$/)]),
+}).strict();
+export type CloserCallFeedbackDraft = z.infer<typeof closerCallFeedbackDraftSchema>;
 
 type CostEstimateInput = {
   durationMs: number;
@@ -134,12 +149,16 @@ export function canProcessLeadRecording({
   permissions,
   userId,
   callerId,
+  closerId,
+  feedbackRole,
 }: {
   permissions: Permission[];
   userId: string;
   callerId: string | null;
+  closerId: string | null;
+  feedbackRole: FeedbackRole;
 }): boolean {
-  return permissions.includes("*") || callerId === userId;
+  return permissions.includes("*") || (feedbackRole === "caller" ? callerId : closerId) === userId;
 }
 
 const structuredDraftSchema = {
@@ -193,6 +212,18 @@ const structuredDraftSchema = {
   ],
 } as const;
 
+const closerStructuredDraftSchema = {
+  type: "object", additionalProperties: false,
+  properties: {
+    isContacted: { type: "string", enum: ["", "Si", "No"] },
+    closerOutcome: { type: "string", enum: ["", "Agenda", "Reagenda", "Seguimiento", "Venta", "No interesado", "No-show"] },
+    closerFeedback: { type: "string" }, isDecisionMaker: { type: "string", enum: ["", "Si", "No"] },
+    decisionMakerName: { type: "string" }, financialSource: { type: "string" }, productFit: { type: "string" },
+    urgencyReason: { type: "string" }, scheduledDate: { type: "string" }, scheduledTime: { type: "string" },
+  },
+  required: ["isContacted", "closerOutcome", "closerFeedback", "isDecisionMaker", "decisionMakerName", "financialSource", "productFit", "urgencyReason", "scheduledDate", "scheduledTime"],
+} as const;
+
 export class CallFeedbackAccessError extends Error {}
 export class CallFeedbackLeadNotFoundError extends Error {}
 
@@ -207,9 +238,9 @@ export type CallFeedbackUsageRecord = {
 };
 
 export type CallFeedbackDependencies = {
-  findLead: (leadId: string) => Promise<{ id: string; callerId: string | null } | undefined>;
+  findLead: (leadId: string) => Promise<{ id: string; callerId: string | null; closerId: string | null } | undefined>;
   transcribe: (audio: File) => Promise<string>;
-  summarize: (transcript: string) => Promise<{
+  summarize: (transcript: string, feedbackRole: FeedbackRole) => Promise<{
     outputText: string;
     inputTokens: number;
     outputTokens: number;
@@ -223,6 +254,7 @@ export async function processCallRecording({
   leadId,
   userId,
   permissions,
+  feedbackRole = "caller",
   dependencies,
 }: {
   audio: File;
@@ -230,6 +262,7 @@ export async function processCallRecording({
   leadId: string;
   userId: string;
   permissions: Permission[];
+  feedbackRole?: FeedbackRole;
   dependencies: CallFeedbackDependencies;
 }) {
   if (!hasPermission(permissions, ["leads:write"])) {
@@ -241,16 +274,14 @@ export async function processCallRecording({
   if (!lead) {
     throw new CallFeedbackLeadNotFoundError("Lead not found");
   }
-  if (!canProcessLeadRecording({ permissions, userId, callerId: lead.callerId })) {
-    throw new CallFeedbackAccessError("Lead is not assigned to this caller");
+  if (!canProcessLeadRecording({ permissions, userId, callerId: lead.callerId, closerId: lead.closerId, feedbackRole })) {
+    throw new CallFeedbackAccessError("Lead is not assigned to this user");
   }
 
   const transcript = await dependencies.transcribe(audio);
-  const response = await dependencies.summarize(transcript);
-  const draft = callFeedbackDraftSchema.parse({
-    ...JSON.parse(response.outputText),
-    extraInfo: transcript,
-  });
+  const response = await dependencies.summarize(transcript, feedbackRole);
+  const rawDraft = { ...JSON.parse(response.outputText), extraInfo: "" };
+  const draft = feedbackRole === "closer" ? closerCallFeedbackDraftSchema.parse(rawDraft) : callFeedbackDraftSchema.parse(rawDraft);
   const estimatedCostMicroUsd = estimateCallFeedbackCostMicroUsd({
     durationMs,
     summaryInputTokens: response.inputTokens,
@@ -273,4 +304,4 @@ export async function processCallRecording({
   };
 }
 
-export { structuredDraftSchema };
+export { closerStructuredDraftSchema, structuredDraftSchema };

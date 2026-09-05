@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+vi.mock("@crm-fran/db", () => ({ alias: (table: unknown) => table, and: vi.fn(), asc: vi.fn(), eq: vi.fn(), gte: vi.fn(), inArray: vi.fn(), lte: vi.fn(), db: new Proxy({}, { get() { throw new Error("Database access forbidden in pure statistics tests"); } }) }));
 
 import {
   buildAttributionFunnels,
@@ -199,9 +200,7 @@ describe("feedback statistics", () => {
         phone: "600000001",
         type: "maestra",
         callerId: "caller-1",
-        callerName: "Caller 1",
         closerId: "closer-1",
-        closerName: "Closer 1",
         createdAt,
         source: "Meta Ads",
         campaign: "VSL Agosto",
@@ -218,9 +217,7 @@ describe("feedback statistics", () => {
         phone: "600000002",
         type: "maestra",
         callerId: "caller-1",
-        callerName: "Caller 1",
         closerId: null,
-        closerName: null,
         createdAt,
         source: "Meta Ads",
         campaign: "VSL Agosto",

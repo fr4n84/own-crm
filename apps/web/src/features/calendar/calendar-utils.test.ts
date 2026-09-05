@@ -15,6 +15,7 @@ function agenda(overrides: Partial<AgendaLead> = {}): AgendaLead {
     caller: { id: "caller-1", name: "Caller" },
     closer: { id: "closer-1", name: "Closer" },
     questions: [],
+    closerOutcome: null,
     scheduledDate: "2026-08-17",
     scheduledTime: "09:30",
     ...overrides,

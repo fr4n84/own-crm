@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { FormEvent } from "react";
@@ -92,7 +93,7 @@ describe("CallRecordingPanel", () => {
       trainingAndPriceAwareness: "",
       urgencyReason: "",
       summary: "Prefiere no continuar",
-      extraInfo: "Transcripción completa",
+      extraInfo: "",
       scheduledDate: "",
       scheduledTime: "",
       alertSeverity: "",
@@ -123,6 +124,7 @@ describe("CallRecordingPanel", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
     const request = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
     expect(request?.body).toBeInstanceOf(FormData);
+    expect((request?.body as FormData).get("feedbackRole")).toBe("caller");
     expect(stopTrack).toHaveBeenCalledOnce();
     expect(onSubmit).not.toHaveBeenCalled();
   });

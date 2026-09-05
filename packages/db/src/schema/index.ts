@@ -18,3 +18,5 @@ export * from "./commercial-playbooks";
 export * from "./navigation-visibility";
 export * from "./marketing-attribution";
 export * from "./closer-sales";
+export * from "./suggestions";
+export * from "./feature-activations";

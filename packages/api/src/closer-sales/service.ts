@@ -46,6 +46,9 @@ export async function listCloserSales() {
         amountPaidCents: closerSaleRecords.amountPaidCents,
         currency: closerSaleRecords.currency,
         soldAt: closerSaleRecords.soldAt,
+        paymentMethod: closerSaleRecords.paymentMethod,
+        financingProvider: closerSaleRecords.financingProvider,
+        installmentMonths: closerSaleRecords.installmentMonths,
         onboardingCompleted: closerSaleRecords.onboardingCompleted,
         onboardingCompletedAt: closerSaleRecords.onboardingCompletedAt,
         onboardingVideoUrl: closerSaleRecords.onboardingVideoUrl,
@@ -86,6 +89,9 @@ export async function updateCloserSaleRecord(input: {
   amountPaidCents: number;
   currency: string;
   soldAt: Date;
+  paymentMethod: "fullpay" | "financed" | null;
+  financingProvider: string | null;
+  installmentMonths: number | null;
   financialOperationId: string;
   onboardingCompleted: boolean;
   onboardingVideoUrl: string | null;
@@ -214,6 +220,9 @@ export async function updateCloserSaleRecord(input: {
       amountPaidCents: input.amountPaidCents,
       currency: input.currency,
       soldAt: input.soldAt,
+      paymentMethod: input.paymentMethod,
+      financingProvider: input.financingProvider,
+      installmentMonths: input.installmentMonths,
       contractedSaleEventId,
       paymentReceivedEventId,
       lastFinancialOperationId: input.financialOperationId,

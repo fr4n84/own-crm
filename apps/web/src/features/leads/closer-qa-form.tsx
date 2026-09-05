@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "@tanstack/react-form";
 import { useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
+import type { CloserCallFeedbackDraft } from "@crm-fran/api/call-feedback";
 import type { QASessionItem } from "@/app/types";
 import { trpc } from "@/utils/trpc";
 import { requiresScheduledContact } from "./closer-follow-up";
@@ -24,6 +25,7 @@ import {
   FieldLabel,
   FieldError,
 } from "@crm-fran/ui/components/field";
+import { CallRecordingPanel } from "./call-recording-panel";
 
 const formSchema = z.object({
   isContacted: z.string(),
@@ -202,9 +204,17 @@ export default function CloserQAForm({
     form.setFieldValue("isContacted", "Si");
   };
 
+  const applyAiDraft = (draft: CloserCallFeedbackDraft) => {
+    setBranch(draft.isContacted);
+    setCloserOutcome(draft.closerOutcome);
+    for (const [name, value] of Object.entries(draft)) {
+      form.setFieldValue(name as FieldName, value);
+    }
+  };
+
   return (
     <form
-      className="mx-auto w-full max-w-lg"
+      className="mx-auto w-full max-w-3xl [&_[data-slot=select-trigger]]:w-full"
       id="closer-qa-form"
       data-testid="closer-qa-form"
       onSubmit={(e) => {
@@ -213,6 +223,7 @@ export default function CloserQAForm({
       }}
     >
       <FieldGroup>
+        <CallRecordingPanel leadId={leadId} feedbackRole="closer" onDraft={(draft) => applyAiDraft(draft as CloserCallFeedbackDraft)} />
         <form.Field name="closerOutcome">
           {(field) => (
             <Field invalid={field.state.meta.errors.length > 0}>
@@ -363,18 +374,17 @@ export default function CloserQAForm({
                   <FieldLabel htmlFor="productFit">
                     Producto recomendado
                   </FieldLabel>
-                  <Select
+                  <Input
+                    id="productFit"
+                    list="closer-product-suggestions"
                     value={field.state.value}
-                    onValueChange={(value) => field.handleChange(value ?? "")}
-                  >
-                    <SelectTrigger id="productFit">
-                      <SelectValue placeholder="Seleccione un producto" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Product 1">Product 1</SelectItem>
-                      <SelectItem value="Product 2">Product 2</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    placeholder="Escribe o selecciona un producto"
+                    onChange={(event) => field.handleChange(event.target.value)}
+                  />
+                  <datalist id="closer-product-suggestions">
+                    <option value="Product 1" />
+                    <option value="Product 2" />
+                  </datalist>
                   <FieldError>
                     {field.state.meta.errors
                       .map((error) => (typeof error === "string" ? error : ""))
@@ -461,6 +471,7 @@ export default function CloserQAForm({
                     <Input
                       id="scheduledTime"
                       type="time"
+                      step={900}
                       value={field.state.value}
                       onChange={(e) => field.handleChange(e.target.value)}
                       aria-invalid={field.state.meta.errors.length > 0}
@@ -484,7 +495,7 @@ export default function CloserQAForm({
   );
 }
 
-function validateCloserAnswers(value: FormValue) {
+export function validateCloserAnswers(value: FormValue) {
   const fieldErrors: Record<string, string[]> = {};
 
   if (value.closerOutcome === "") {
@@ -492,22 +503,6 @@ function validateCloserAnswers(value: FormValue) {
   }
 
   if (value.isContacted === "Si") {
-    if (value.isDecisionMaker === "") {
-      fieldErrors.isDecisionMaker = ["Seleccione una opción"];
-    }
-    if (value.decisionMakerName.trim() === "") {
-      fieldErrors.decisionMakerName = ["Requerido"];
-    }
-    if (value.financialSource.trim() === "") {
-      fieldErrors.financialSource = ["Requerido"];
-    }
-    if (value.productFit.trim() === "") {
-      fieldErrors.productFit = ["Requerido"];
-    }
-    if (value.urgencyReason.trim() === "") {
-      fieldErrors.urgencyReason = ["Requerido"];
-    }
-
     if (requiresScheduledContact(value.closerOutcome) && value.scheduledDate === "") {
       fieldErrors.scheduledDate = ["Requerido"];
     }
@@ -521,7 +516,7 @@ function validateCloserAnswers(value: FormValue) {
     : undefined;
 }
 
-function buildPayload(
+export function buildPayload(
   leadId: string,
   value: FormValue,
 ):
@@ -572,37 +567,18 @@ function buildPayload(
       question: "Resultado de la agenda",
       answer: value.closerOutcome,
     },
-    {
-      questionKey: "isDecisionMaker",
-      question: "¿Es el decisor?",
-      answer: value.isDecisionMaker === "Si" ? "Si" : "No",
-    },
-    {
-      questionKey: "decisionMakerName",
-      question: "¿Quién es la persona correcta?",
-      answer: value.decisionMakerName,
-    },
-    {
-      questionKey: "financialSource",
-      question: "¿De dónde sale su capacidad económica?",
-      answer: value.financialSource,
-    },
-    {
-      questionKey: "productFit",
-      question: "Producto recomendado",
-      answer: value.productFit,
-    },
-    {
-      questionKey: "urgencyReason",
-      question: "¿De dónde sale la urgencia?",
-      answer: value.urgencyReason,
-    },
-    {
-      questionKey: "extraInfo",
-      question: "Información extra",
-      answer: value.extraInfo,
-    },
   ];
+
+  questions.push(
+    ...[
+      { questionKey: "isDecisionMaker", question: "¿Es el decisor?", answer: value.isDecisionMaker },
+      { questionKey: "decisionMakerName", question: "¿Quién es la persona correcta?", answer: value.decisionMakerName },
+      { questionKey: "financialSource", question: "¿De dónde sale su capacidad económica?", answer: value.financialSource },
+      { questionKey: "productFit", question: "Producto recomendado", answer: value.productFit },
+      { questionKey: "urgencyReason", question: "¿De dónde sale la urgencia?", answer: value.urgencyReason },
+      { questionKey: "extraInfo", question: "Información extra", answer: value.extraInfo },
+    ].filter(({ answer }) => answer.trim() !== ""),
+  );
 
   if (value.scheduledDate !== "" && value.scheduledTime !== "") {
     questions.push(

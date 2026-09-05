@@ -21,6 +21,11 @@ export function createLeadColumns(
     readOnly?: boolean;
   } = {},
 ): ColumnDef<any>[] {
+  const mobileProjection = (items: ColumnDef<any>[]) => items.map((column) => {
+    const accessorKey = "accessorKey" in column ? column.accessorKey : undefined;
+    const visible = accessorKey === "name" || accessorKey === "phone" || column.id === "actions";
+    return visible ? column : { ...column, meta: { ...column.meta, mobileHidden: true } };
+  });
   const columns: ColumnDef<any>[] = [
     {
       accessorKey: "name",
@@ -101,7 +106,7 @@ export function createLeadColumns(
     if (actionsIndex >= 0) columns.splice(actionsIndex, 1);
   }
 
-  if (options.variant !== "available") return columns;
+  if (options.variant !== "available") return mobileProjection(columns);
 
   const assignedOnlyHeaders = new Set([
     "Respuesta",
@@ -110,9 +115,9 @@ export function createLeadColumns(
     "Closer",
   ]);
 
-  return columns.filter(
+  return mobileProjection(columns.filter(
     (column) =>
       typeof column.header !== "string" ||
       !assignedOnlyHeaders.has(column.header),
-  );
+  ));
 }

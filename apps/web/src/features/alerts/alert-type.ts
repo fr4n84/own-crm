@@ -6,13 +6,7 @@ export type AlertTypeFilter =
   | "future_call"
   | "rescheduled";
 
-export const ALERT_TYPE_LABELS: Record<Exclude<AlertTypeFilter, "all">, string> = {
-  no_contact: "Sin contacto",
-  follow_up: "Seguimiento",
-  appointment: "Agenda",
-  future_call: "Llamar futuro",
-  rescheduled: "Reagenda",
-};
+export { ALERT_KIND_LABELS as ALERT_TYPE_LABELS } from "./alert-labels";
 
 type AlertQuestion = {
   questionKey: string;

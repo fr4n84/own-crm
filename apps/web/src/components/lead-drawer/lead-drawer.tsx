@@ -12,6 +12,7 @@ import {
 } from "@crm-fran/ui/components/drawer";
 import { Button } from "@crm-fran/ui/components/button";
 import { XIcon } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@crm-fran/ui/components/dialog";
 
 interface LeadDrawerProps {
   open: boolean;
@@ -28,6 +29,7 @@ interface LeadDrawerProps {
   /** Label del botón Guardar del footer. Default: "Guardar". */
   submitLabel?: string;
   children: ReactNode;
+  presentation?: "drawer" | "dialog";
 }
 
 export default function LeadDrawer({
@@ -39,7 +41,20 @@ export default function LeadDrawer({
   type,
   submitFormId,
   submitLabel = "Guardar",
+  presentation = "drawer",
 }: LeadDrawerProps) {
+  if (presentation === "dialog") {
+    return <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-full max-w-5xl flex-col overflow-hidden p-0 text-sm">
+        <DialogHeader className="border-b px-4 py-4 pr-14 sm:px-6"><DialogTitle>{title}</DialogTitle>{description && <DialogDescription>{description}</DialogDescription>}</DialogHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">{children}</div>
+        {type === "edit" && <DialogFooter className="border-t px-4 py-4 sm:px-6">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          {submitFormId && <Button type="submit" form={submitFormId}>{submitLabel}</Button>}
+        </DialogFooter>}
+      </DialogContent>
+    </Dialog>;
+  }
   return (
     <Drawer open={open} onOpenChange={onOpenChange} swipeDirection="right">
       <DrawerContent className="flex h-dvh max-h-dvh max-w-xl flex-col p-0">

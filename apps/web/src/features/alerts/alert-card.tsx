@@ -23,8 +23,8 @@ import {
   getAlertType,
   getAppointmentHistory,
 } from "./alert-type";
-import { AlertResolutionDialog } from "./alert-resolution-dialog";
 import type { Alert } from "./use-alerts";
+import { getAlertKindLabel, getAlertSeverityLabel } from "./alert-labels";
 
 interface AlertCardProps {
   alert: Alert;
@@ -33,14 +33,9 @@ interface AlertCardProps {
 }
 
 const SEVERITY_PRESENTATION = {
-  urgent: { label: "Alta", className: "bg-destructive/10 text-destructive" },
-  warning: { label: "Media", className: "bg-warning/15 text-warning-foreground" },
-  info: { label: "Baja", className: "bg-success/15 text-success-foreground" },
-} as const;
-
-const KIND_LABEL = {
-  no_contact: "No contact",
-  follow_up: "Seguimiento",
+  urgent: { className: "bg-destructive/10 text-destructive" },
+  warning: { className: "bg-warning/15 text-warning-foreground" },
+  info: { className: "bg-success/15 text-success-foreground" },
 } as const;
 
 export function AlertCard({
@@ -53,9 +48,8 @@ export function AlertCard({
     getEffectiveAlertSeverity(alert, relevancePreferences, now) ??
     normalizeAlertSeverity(alert.severity);
   const presentation = severity
-    ? SEVERITY_PRESENTATION[severity]
-    : { label: alert.severity, className: "" };
-  const kind = alert.kind as keyof typeof KIND_LABEL;
+    ? { label: getAlertSeverityLabel(severity), ...SEVERITY_PRESENTATION[severity] }
+    : { label: getAlertSeverityLabel(alert.severity), className: "" };
   const alertType = getAlertType(alert);
   const appointmentHistory = getAppointmentHistory(alert);
   const remainingMs = getAlertRemaining(alert, now);
@@ -87,13 +81,6 @@ export function AlertCard({
           </div>
           <div className="flex flex-col items-end gap-1">
             <div className="flex flex-wrap items-center justify-end gap-2">
-              {alert.lead ? (
-                <AssignLeadDrawer
-                  lead={alert.lead}
-                  mode="post-assignment-feedback"
-                  triggerLabel="Registrar gestión"
-                />
-              ) : null}
               <Button
                 variant="outline"
                 size="sm"
@@ -101,7 +88,6 @@ export function AlertCard({
               >
                 Descartar
               </Button>
-              <AlertResolutionDialog alert={alert} />
               <Badge
                 variant={severity ? "outline" : "default"}
                 className={presentation.className}
@@ -124,7 +110,7 @@ export function AlertCard({
 
       <CardContent className="flex flex-col gap-1">
         <p className="text-xs font-medium">
-          {alertType ? ALERT_TYPE_LABELS[alertType] : KIND_LABEL[kind] ?? alert.kind}
+          {alertType ? ALERT_TYPE_LABELS[alertType] : getAlertKindLabel(alert.kind)}
         </p>
         <p className="text-xs text-muted-foreground">{alert.message}</p>
         {appointmentHistory.length > 0 && (
@@ -143,6 +129,7 @@ export function AlertCard({
         <p className="text-xs text-muted-foreground">
           Próxima: {new Date(alert.nextShowAt).toLocaleString()}
         </p>
+        {alert.lead ? <div className="mt-3 flex justify-center"><AssignLeadDrawer lead={alert.lead} mode="post-assignment-feedback" triggerLabel="Gestionar" /></div> : null}
       </CardContent>
     </Card>
   );

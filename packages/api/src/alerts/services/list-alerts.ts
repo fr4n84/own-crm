@@ -1,6 +1,7 @@
 import { db, asc, eq, isNull, type SQL } from "@crm-fran/db";
 import { alerts } from "@crm-fran/db/schema/index";
 import type { Permission } from "@crm-fran/db/schema/auth";
+import { buildAlertAccessCondition } from "./alert-access";
 
 export type ListAlertsInput = {
 	actorId: string;
@@ -20,6 +21,8 @@ export async function listAlerts(input: ListAlertsInput) {
 	const offset = input.offset ?? 0;
 
 	const conditions: SQL<unknown>[] = [];
+	const accessCondition = buildAlertAccessCondition(input.actorId, input.permissions);
+	if (accessCondition) conditions.push(accessCondition);
 
 	if (input.leadId) {
 		conditions.push(eq(alerts.leadId, input.leadId));

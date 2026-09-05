@@ -1,8 +1,9 @@
 import { TRPCError } from "@trpc/server";
-import { db, eq } from "@crm-fran/db";
-import { alerts, LEAD_ACTIVITY_KIND } from "@crm-fran/db/schema/index";
+import { db, eq, sql } from "@crm-fran/db";
+import { alerts, leads, LEAD_ACTIVITY_KIND } from "@crm-fran/db/schema/index";
 import type { Permission } from "@crm-fran/db/schema/auth";
 import { appendLeadActivity } from "../../leads/services/lead-activity";
+import { canAccessAlertRecord } from "./alert-access-policy";
 
 export type DismissAlertInput = {
 	id: string;
@@ -10,33 +11,27 @@ export type DismissAlertInput = {
 	permissions: Permission[];
 };
 
-function isAdmin(permissions: Permission[]) {
-	return (
-		permissions.includes("*") ||
-		permissions.includes("alerts:*") ||
-		permissions.includes("users:read")
-	);
-}
-
 export async function dismissAlert(input: DismissAlertInput) {
 	return db.transaction(async (tx) => {
-	const alert = await tx.query.alerts.findFirst({
-		where: (table, { eq }) => eq(table.id, input.id),
-	});
-
-	if (!alert) {
-		throw new TRPCError({
-			code: "NOT_FOUND",
-			message: "Alert not found",
+		await tx.execute(sql`select ${alerts.id} from ${alerts} inner join ${leads} on ${leads.id} = ${alerts.leadId} where ${alerts.id} = ${input.id} for update`);
+		const alert = await tx.query.alerts.findFirst({
+			where: (table, { eq }) => eq(table.id, input.id),
+			with: { lead: { columns: { callerId: true, closerId: true } } },
 		});
-	}
 
-	if (!isAdmin(input.permissions) && alert.targetUserId !== input.actorId) {
-		throw new TRPCError({
-			code: "FORBIDDEN",
-			message: "You do not have permission to dismiss this alert",
-		});
-	}
+		if (!alert) {
+			throw new TRPCError({
+				code: "NOT_FOUND",
+				message: "Alert not found",
+			});
+		}
+
+		if (!canAccessAlertRecord(alert, input.actorId, input.permissions)) {
+			throw new TRPCError({
+				code: "FORBIDDEN",
+				message: "You do not have permission to dismiss this alert",
+			});
+		}
 
 	if (alert.resolvedAt) {
 		throw new TRPCError({

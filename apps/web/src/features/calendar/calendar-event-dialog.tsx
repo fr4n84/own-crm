@@ -111,6 +111,7 @@ export function CalendarEventDialog({
               <Input
                 id="calendar-event-time"
                 type="time"
+                step={900}
                 value={startTime}
                 onChange={(event) => setStartTime(event.target.value)}
               />
