@@ -10,7 +10,7 @@ import {
   type NavigationModuleId,
   type NavigationVisibilityEntry,
 } from "../../navigation-visibility";
-import { normalizePermissions } from "./list-user-access";
+import { normalizePermissions } from "../../permissions";
 
 export type NavigationVisibilitySnapshot = {
   configured: boolean;

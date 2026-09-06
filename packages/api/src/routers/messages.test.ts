@@ -53,7 +53,7 @@ const now = new Date("2026-09-04T10:00:00Z");
 const context: Context = {
   session: {
     session: { id: "session", token: "test-token", userId: "sender", expiresAt: now, createdAt: now, updatedAt: now },
-    user: { id: "sender", name: "Sender", email: "sender@example.com", emailVerified: true, createdAt: now, updatedAt: now, roleId: "role-caller", leadActive: "", scoring: 0 },
+    user: { id: "sender", name: "Sender", email: "sender@example.com", emailVerified: true, accessStatus: "active", createdAt: now, updatedAt: now, roleId: "role-caller", leadActive: "", scoring: 0 },
   },
   role: null,
   permissions: [],

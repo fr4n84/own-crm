@@ -2,6 +2,7 @@ import { db } from "@crm-fran/db";
 import { auth } from "@crm-fran/auth";
 import type { NextRequest } from "next/server";
 import type { ResolvedRole } from "@crm-fran/db/schema/auth";
+import { USER_ACCESS_STATUS } from "@crm-fran/db/schema/auth";
 
 export async function createContext(req: Pick<NextRequest, "headers">) {
   const session = await auth.api.getSession({
@@ -15,6 +16,10 @@ export async function createContext(req: Pick<NextRequest, "headers">) {
   };
 
   if (!session) {
+    return obj;
+  }
+
+  if (session.user.accessStatus !== USER_ACCESS_STATUS.ACTIVE) {
     return obj;
   }
 

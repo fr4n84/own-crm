@@ -1,4 +1,4 @@
-import { COMMERCIAL_ROLE_IDS, ROLE_ID } from "@crm-fran/db/schema/auth";
+import { COMMERCIAL_ROLE_IDS, ROLE_ID, USER_ACCESS_STATUS } from "@crm-fran/db/schema/auth";
 import { APIError } from "better-auth/api";
 
 export const userRoleHooks = {
@@ -8,7 +8,7 @@ export const userRoleHooks = {
       if (typeof roleId !== "string" || !COMMERCIAL_ROLE_IDS.some((allowed) => allowed === roleId)) {
         throw new APIError("BAD_REQUEST", { message: "Choose Caller, Closer or Hybrid" });
       }
-      return { data: { ...data, roleId } };
+      return { data: { ...data, roleId, accessStatus: USER_ACCESS_STATUS.PENDING } };
     },
   },
   update: {

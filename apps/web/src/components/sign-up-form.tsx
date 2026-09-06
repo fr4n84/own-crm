@@ -9,7 +9,8 @@ import {
 import { Input } from "@crm-fran/ui/components/input";
 import { Label } from "@crm-fran/ui/components/label";
 import { useForm } from "@tanstack/react-form";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useState } from "react";
 import { toast } from "sonner";
 import z from "zod";
 
@@ -24,8 +25,8 @@ const COMMERCIAL_ROLES = [
 ];
 
 export default function SignUpForm() {
-  const router = useRouter();
   const { isPending } = authClient.useSession();
+  const [registrationPending, setRegistrationPending] = useState(false);
 
   const form = useForm({
     defaultValues: {
@@ -44,8 +45,8 @@ export default function SignUpForm() {
         },
         {
           onSuccess: () => {
-            router.push("/");
-            toast.success("Sign up successful");
+            setRegistrationPending(true);
+            toast.success("Cuenta creada y pendiente de aprobación");
           },
           onError: (error) => {
             toast.error(error.error.message || error.error.statusText);
@@ -65,6 +66,14 @@ export default function SignUpForm() {
 
   if (isPending) {
     return <Loader />;
+  }
+
+  if (registrationPending) {
+    return <div className="mx-auto mt-10 flex w-full max-w-md flex-col gap-4 p-6 text-center" role="status">
+      <h1 className="text-2xl font-bold">Cuenta pendiente de aprobación</h1>
+      <p className="text-sm text-muted-foreground">Un administrador debe aprobar tu cuenta antes de que puedas acceder al CRM.</p>
+      <Button render={<Link href="/login" />}>Volver a iniciar sesión</Button>
+    </div>;
   }
 
   return (
@@ -199,7 +208,7 @@ export default function SignUpForm() {
       <div className="mt-4 text-center">
         <Button
           variant="link"
-          onClick={() => router.push("/login")}
+          render={<Link href="/login" />}
           className="text-indigo-600 hover:text-indigo-800"
         >
           Already have an account? Sign In

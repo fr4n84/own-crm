@@ -10,6 +10,8 @@ export default {
       "packages/api/src/dashboard/conversion-funnel-range.test.ts",
       "packages/api/src/commercial-observatory/access.test.ts",
       "packages/api/src/navigation-visibility.test.ts",
+      "packages/api/src/account-access-boundary.test.ts",
+      "packages/api/src/users/services/user-access-lifecycle.contract.test.ts",
       "packages/ui/src/lib/navigation-policy.test.ts",
       "packages/api/src/dashboard/conversion-funnel.test.ts",
       "apps/web/src/components/dashboard.visual-contract.test.ts",
@@ -48,6 +50,7 @@ export default {
       "packages/api/src/leads/services/assign-to-caller.contract.test.ts",
       "packages/api/src/leads/services/caller-assignment-marker.contract.test.ts",
       "packages/db/src/migrations/0039_caller_assignment_activation.test.ts",
+      "packages/db/src/schema/user-access-lifecycle.test.ts",
     ],
   },
 };

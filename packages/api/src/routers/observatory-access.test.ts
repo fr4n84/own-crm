@@ -6,7 +6,7 @@ vi.mock("../commercial-evidence/service",()=>({listEvidenceCurrencies:mocks.read
 vi.mock("../alerts/services/index",()=>({processRecurringAlerts:vi.fn()}));vi.mock("../leads/services/index",()=>({isCloserOf:vi.fn(),hasCloserSession:vi.fn()}));
 import {commercialEvidenceRouter} from "./commercial-evidence";
 const date=new Date();
-function context(roleId:string):Context{return {session:{session:{id:"s",token:"t",userId:"u",expiresAt:date,createdAt:date,updatedAt:date},user:{id:"u",name:"User",email:"u@example.com",emailVerified:true,createdAt:date,updatedAt:date,roleId,leadActive:"",scoring:0}},role:{id:roleId,name:roleId,permissions:["leads:read"]},permissions:["leads:read"]};}
+function context(roleId:string):Context{return {session:{session:{id:"s",token:"t",userId:"u",expiresAt:date,createdAt:date,updatedAt:date},user:{id:"u",name:"User",email:"u@example.com",emailVerified:true,accessStatus:"active",createdAt:date,updatedAt:date,roleId,leadActive:"",scoring:0}},role:{id:roleId,name:roleId,permissions:["leads:read"]},permissions:["leads:read"]};}
 beforeEach(()=>{vi.clearAllMocks();mocks.settings.mockResolvedValue({configured:false,roleIdsByModule:{}});mocks.read.mockResolvedValue(["EUR"]);});
 describe("direct observatory API requests",()=>{
  it("denies anonymous requests before reading data",async()=>{await expect(commercialEvidenceRouter.createCaller({session:null,role:null,permissions:[]}).currencies()).rejects.toMatchObject({code:"UNAUTHORIZED"});expect(mocks.read).not.toHaveBeenCalled()});

@@ -30,10 +30,10 @@ describe("user access directory", () => {
     await db.delete(roles).where(inArray(roles.id, roleIds));
   });
 
-  async function createUser(input: { name: string; email: string; roleId: string; emailVerified?: boolean }) {
+  async function createUser(input: { name: string; email: string; roleId: string; accessStatus?: "pending" | "active" | "disabled" }) {
     const id = crypto.randomUUID();
     userIds.push(id);
-    await db.insert(user).values({ id, emailVerified: input.emailVerified ?? false, ...input });
+    await db.insert(user).values({ id, ...input });
     return id;
   }
 
@@ -46,7 +46,7 @@ describe("user access directory", () => {
   }
 
   it("returns sanitized users, all roles and effective permissions", async () => {
-    const firstId = await createUser({ name: "Ana Caller", email: "ana@example.com", roleId: roleIds[0]!, emailVerified: true });
+    const firstId = await createUser({ name: "Ana Caller", email: "ana@example.com", roleId: roleIds[0]!, accessStatus: "active" });
     await createUser({ name: "Beto Closer", email: "beto@example.com", roleId: roleIds[1]! });
 
     const result = await listUserAccess({});
@@ -57,20 +57,21 @@ describe("user access directory", () => {
       id: firstId,
       name: "Ana Caller",
       email: "ana@example.com",
-      status: "verified",
+      status: "active",
+      statusVersion: 1,
       roles: [{ id: roleIds[0], name: "Caller test" }],
       effectivePermissions: ["alerts:read", "leads:*"],
     });
-    expect(Object.keys(first).sort()).toEqual(["effectivePermissions", "email", "id", "name", "roles", "status"]);
+    expect(Object.keys(first).sort()).toEqual(["effectivePermissions", "email", "id", "name", "roles", "status", "statusVersion"]);
     expect(emptyRole).toMatchObject({ userCount: 0, effectivePermissions: ["reports:read"] });
     expect(JSON.stringify(result)).not.toMatch(/token|session|password|ipAddress|userAgent/i);
   });
 
   it("applies compact search, role and status filters independently", async () => {
-    const matchingId = await createUser({ name: "Lucia Ventas", email: "lucia@example.com", roleId: roleIds[1]!, emailVerified: true });
+    const matchingId = await createUser({ name: "Lucia Ventas", email: "lucia@example.com", roleId: roleIds[1]!, accessStatus: "active" });
     await createUser({ name: "Otro Perfil", email: "otro@example.com", roleId: roleIds[0]! });
 
-    const result = await listUserAccess({ search: "LUCIA", roleId: roleIds[1], status: "verified" });
+    const result = await listUserAccess({ search: "LUCIA", roleId: roleIds[1], status: "active" });
 
     expect(result.users.map((entry) => entry.id)).toEqual([matchingId]);
   });

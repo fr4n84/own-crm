@@ -16,7 +16,7 @@ import { suggestionsRouter } from "./suggestions";
 
 const now = new Date("2026-09-05T10:00:00Z");
 function context(permissions: Context["permissions"]): Context {
-  return { session: { session: { id: "s", token: "t", userId: "u1", expiresAt: now, createdAt: now, updatedAt: now }, user: { id: "u1", name: "User", email: "u@example.com", emailVerified: true, createdAt: now, updatedAt: now, roleId: "role-caller", leadActive: "", scoring: 0 } }, role: null, permissions };
+  return { session: { session: { id: "s", token: "t", userId: "u1", expiresAt: now, createdAt: now, updatedAt: now }, user: { id: "u1", name: "User", email: "u@example.com", emailVerified: true, accessStatus: "active", createdAt: now, updatedAt: now, roleId: "role-caller", leadActive: "", scoring: 0 } }, role: null, permissions };
 }
 
 describe("suggestions router", () => {

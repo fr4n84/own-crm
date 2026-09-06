@@ -25,6 +25,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (access.status === "loading") return <main className="p-6" role="status">Cargando tu espacio de trabajo…</main>;
   if (access.status === "error") return <main className="flex flex-col gap-3 p-6"><p role="alert">No se pudo cargar tu acceso. No se mostrará un menú incompleto.</p><Button onClick={access.retry}>Reintentar</Button></main>;
   if (access.status === "signed-out") return <main className="p-6"><Link href="/login">Iniciar sesión</Link></main>;
+  if (access.status === "pending") return <main className="flex flex-col gap-3 p-6"><p role="status">Tu cuenta está pendiente de aprobación por un administrador.</p><Link href="/login">Iniciar sesión</Link></main>;
+  if (access.status === "disabled") return <main className="flex flex-col gap-3 p-6"><p role="alert">Tu acceso está desactivado. Contacta con un administrador para solicitar su reactivación.</p><Link href="/login">Iniciar sesión</Link></main>;
 
   return (
     <SidebarProvider

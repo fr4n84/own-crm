@@ -77,7 +77,9 @@ export function validateNavigationVisibility(
   }
   const knownRoles = new Map(roles.map((role) => [role.id, role]));
   const seen = new Set<string>();
-  const result: Record<NavigationModuleId, string[]> = Object.create(null) as Record<NavigationModuleId, string[]>;
+  // Drizzle inspects object prototypes while mapping update values. A null-prototype
+  // record crashes its entity check before the JSON column encoder can run.
+  const result = {} as Record<NavigationModuleId, string[]>;
 
   for (const entry of entries) {
     if (!NAVIGATION_MODULE_IDS.includes(entry.moduleId as NavigationModuleId)) {

@@ -1,6 +1,6 @@
 import { issuePasswordResetCode, PasswordRecoveryError } from "@crm-fran/auth/password-recovery";
 import { and, db, eq } from "@crm-fran/db";
-import { COMMERCIAL_ROLE_IDS, user } from "@crm-fran/db/schema/auth";
+import { COMMERCIAL_ROLE_IDS, USER_ACCESS_STATUS, user } from "@crm-fran/db/schema/auth";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { router } from "../index";
@@ -9,12 +9,13 @@ import { listClosers } from "../users/services/list-closers";
 import { listUserAccess } from "../users/services/list-user-access";
 import { getNavigationVisibility, updateNavigationVisibility } from "../users/services/navigation-visibility";
 import { NAVIGATION_MODULE_IDS } from "../navigation-visibility";
+import { updateUserAccessStatus } from "../users/services/user-access-lifecycle";
 import { protectedProcedure } from "../index";
 
 const accessDirectoryInput = z.object({
   search: z.string().trim().max(120).optional(),
   roleId: z.string().trim().min(1).max(120).optional(),
-  status: z.enum(["verified", "pending"]).optional(),
+  status: z.enum([USER_ACCESS_STATUS.PENDING, USER_ACCESS_STATUS.ACTIVE, USER_ACCESS_STATUS.DISABLED]).optional(),
 }).optional();
 
 const navigationVisibilityInput = z.object({
@@ -47,6 +48,22 @@ export const usersRouter = router({
       }
       return updated;
     }),
+  updateAccessStatus: permittedProcedure(["*"])
+    .input(z.object({
+      userId: z.string().trim().min(1).max(128),
+      action: z.enum(["approve", "disable", "reactivate"]),
+      expectedStatus: z.enum([USER_ACCESS_STATUS.PENDING, USER_ACCESS_STATUS.ACTIVE, USER_ACCESS_STATUS.DISABLED]),
+      expectedVersion: z.number().int().positive(),
+      reason: z.string().trim().max(500).optional(),
+    }))
+    .mutation(({ ctx, input }) => updateUserAccessStatus({
+      actorId: ctx.session.user.id,
+      targetUserId: input.userId,
+      action: input.action,
+      expectedStatus: input.expectedStatus,
+      expectedVersion: input.expectedVersion,
+      reason: input.reason,
+    })),
 	listClosers: permittedProcedure(["users:read"])
 		.input(z.object({}).optional())
 		.query(async () => {

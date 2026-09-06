@@ -1,18 +1,7 @@
 import { asc, db, eq } from "@crm-fran/db";
 import { roles, user } from "@crm-fran/db/schema/index";
-import type { Permission } from "@crm-fran/db/schema/auth";
-
-const KNOWN_PERMISSIONS = new Set<Permission>([
-  "leads:read", "leads:write", "leads:delete", "leads:*",
-  "reports:read",
-  "users:*", "users:read", "users:write", "users:delete", "users:create", "users:update",
-  "profile:read", "profile:write", "profile:*",
-  "alerts:read", "alerts:write", "alerts:delete", "alerts:*",
-  "settings:read", "settings:write",
-  "*",
-]);
-
-export type UserAccessStatus = "verified" | "pending";
+import type { UserAccessStatus } from "@crm-fran/db/schema/auth";
+import { normalizePermissions } from "../../permissions";
 
 export type UserAccessFilters = {
   search?: string;
@@ -20,12 +9,7 @@ export type UserAccessFilters = {
   status?: UserAccessStatus;
 };
 
-export function normalizePermissions(value: unknown): Permission[] {
-  if (!Array.isArray(value)) return [];
-  return [...new Set(value.filter((permission): permission is Permission =>
-    typeof permission === "string" && KNOWN_PERMISSIONS.has(permission as Permission),
-  ))].sort((left, right) => left.localeCompare(right));
-}
+export { normalizePermissions } from "../../permissions";
 
 export async function listUserAccess(filters: UserAccessFilters) {
   const [userRows, roleRows] = await Promise.all([
@@ -34,7 +18,8 @@ export async function listUserAccess(filters: UserAccessFilters) {
         id: user.id,
         name: user.name,
         email: user.email,
-        emailVerified: user.emailVerified,
+        accessStatus: user.accessStatus,
+        statusVersion: user.statusVersion,
         roleId: user.roleId,
         roleName: roles.name,
         rolePermissions: roles.permissions,
@@ -51,13 +36,14 @@ export async function listUserAccess(filters: UserAccessFilters) {
   const search = filters.search?.trim().toLocaleLowerCase("es") ?? "";
   const users = userRows
     .filter((row) => !filters.roleId || row.roleId === filters.roleId)
-    .filter((row) => !filters.status || (row.emailVerified ? "verified" : "pending") === filters.status)
+    .filter((row) => !filters.status || row.accessStatus === filters.status)
     .filter((row) => !search || `${row.name}\n${row.email}`.toLocaleLowerCase("es").includes(search))
     .map((row) => ({
       id: row.id,
       name: row.name,
       email: row.email,
-      status: (row.emailVerified ? "verified" : "pending") as UserAccessStatus,
+      status: row.accessStatus,
+      statusVersion: row.statusVersion,
       roles: [{ id: row.roleId, name: row.roleName }],
       effectivePermissions: normalizePermissions(row.rolePermissions),
     }));
@@ -78,7 +64,8 @@ export async function listUserAccess(filters: UserAccessFilters) {
           id: row.id,
           name: row.name,
           email: row.email,
-          status: (row.emailVerified ? "verified" : "pending") as UserAccessStatus,
+          status: row.accessStatus,
+          statusVersion: row.statusVersion,
         })),
     })),
   };

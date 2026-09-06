@@ -1,6 +1,7 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 
 import type { Context } from "./context";
+import { assertActiveAccount } from "./trpc/account-access";
 
 export const t = initTRPC.context<Context>().create();
 
@@ -19,6 +20,7 @@ export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
       cause: "No session",
     });
   }
+  assertActiveAccount(ctx.session.user);
   return next({
     ctx: {
       ...ctx,

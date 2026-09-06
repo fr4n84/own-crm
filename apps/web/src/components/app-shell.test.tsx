@@ -23,6 +23,18 @@ beforeEach(() => { mocks.status = "ready"; });
 describe("application shell", () => {
   it("waits for complete access before rendering dashboard or sidebar", () => { mocks.pathname="/"; mocks.status="loading"; render(<AppShell><div>Panel</div></AppShell>); expect(screen.queryByText("Panel")).toBeNull(); expect(screen.queryByTestId("private-sidebar")).toBeNull(); expect(screen.getByRole("status")).toBeTruthy(); });
   it("fails closed on access errors with retry", () => { mocks.pathname="/"; mocks.status="error"; render(<AppShell><div>Panel</div></AppShell>); expect(screen.queryByText("Panel")).toBeNull(); expect(screen.getByRole("button",{name:"Reintentar"})).toBeTruthy(); });
+  it.each([
+    ["pending", "pendiente de aprobación"],
+    ["disabled", "desactivado"],
+  ])("shows an actionable %s state without private UI", (status, message) => {
+    mocks.pathname = "/usuarios-accesos";
+    mocks.status = status;
+    render(<AppShell><div>Panel privado</div></AppShell>);
+    expect(screen.getByText(new RegExp(message, "i"))).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Iniciar sesión" })).toBeTruthy();
+    expect(screen.queryByText("Panel privado")).toBeNull();
+    expect(screen.queryByTestId("private-sidebar")).toBeNull();
+  });
   it("renders login without any private navigation shell", () => {
     mocks.pathname = "/login";
     render(<AppShell><div>Acceso</div></AppShell>);

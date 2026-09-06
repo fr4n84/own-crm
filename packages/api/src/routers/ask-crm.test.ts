@@ -30,6 +30,7 @@ describe("Pregúntale al CRM router", () => {
           name: "Caller",
           email: "caller@example.com",
           emailVerified: true,
+          accessStatus: "active",
           leadActive: "active",
           scoring: 0,
           createdAt: new Date(),

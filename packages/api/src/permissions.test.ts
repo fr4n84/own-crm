@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { hasPermission } from "./permissions";
+import { hasPermission, normalizePermissions } from "./permissions";
 
 describe("hasPermission", () => {
+  it("normalizes every canonical sales permission instead of dropping it", () => {
+    expect(normalizePermissions(["sales:read", "sales:write", "sales:*", "unknown"])).toEqual(["sales:*", "sales:read", "sales:write"]);
+  });
   describe("wildcard admin", () => {
     it("grants access when user has the global wildcard '*'", () => {
       expect(hasPermission(["*"], ["users:create"])).toBe(true);

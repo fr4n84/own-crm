@@ -13,7 +13,7 @@ describe("public account roles", () => {
     });
   }
   it("defaults omitted roles to caller", async () => {
-    await expect(userRoleHooks.create.before({ name: "Caller" })).resolves.toMatchObject({ data: { roleId: "role-caller" } });
+    await expect(userRoleHooks.create.before({ name: "Caller" })).resolves.toMatchObject({ data: { roleId: "role-caller", accessStatus: "pending" } });
   });
   it("allows ordinary profile updates without changing roles", async () => {
     await expect(userRoleHooks.update.before({ name: "New name" })).resolves.toEqual({ data: { name: "New name" } });

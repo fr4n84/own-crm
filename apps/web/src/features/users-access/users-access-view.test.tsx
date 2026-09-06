@@ -1,17 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-const mocks = vi.hoisted(() => ({ mutate: vi.fn(), success: vi.fn(), error: vi.fn() }));
+const mocks = vi.hoisted(() => ({ mutate: vi.fn(), visibilityMutate: vi.fn(), accessMutate: vi.fn(), success: vi.fn(), error: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { success: mocks.success, error: mocks.error } }));
 vi.mock("@/utils/trpc", () => ({ trpc: { users: {
   updateCommercialRole: { mutationOptions: (options: object) => ({ mutationFn: mocks.mutate, ...options }) },
+  updateNavigationVisibility: { mutationOptions: (options: object) => ({ mutationFn: mocks.visibilityMutate, ...options }) },
+  updateAccessStatus: { mutationOptions: (options: object) => ({ mutationFn: mocks.accessMutate, ...options }) },
   accessDirectory: { queryKey: () => ["directory"] },
+  navigationVisibility: { queryKey: () => ["visibility"] },
 } } }));
 vi.mock("@crm-fran/ui/components/select", () => ({
   Select: ({ value, onValueChange, disabled, items }: { value: string; onValueChange: (value: string) => void; disabled: boolean; items: { value: string; label: string }[] }) => <select aria-label="Role" value={value} disabled={disabled} onChange={(e) => onValueChange(e.target.value)}>{items.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>,
   SelectContent: () => null, SelectGroup: () => null, SelectItem: () => null, SelectTrigger: () => null, SelectValue: () => null,
 }));
-import { CommercialRoleEditor } from "./users-access-view";
+import { AccessStatusEditor, CommercialRoleEditor, VisibilityEditor } from "./users-access-view";
 afterEach(cleanup);
 beforeEach(() => { vi.clearAllMocks(); vi.spyOn(window, "confirm").mockReturnValue(true); });
 function setup() {
@@ -45,5 +48,38 @@ describe("commercial role save recovery", () => {
     expect(screen.getByText("Guardar rol")).toBeEnabled();
     expect(mocks.success).not.toHaveBeenCalled();
     expect(mocks.mutate.mock.calls[0]?.[0]).toEqual({ userId: "commercial", expectedRoleId: "role-caller", roleId: "role-closer" });
+  });
+});
+
+describe("navigation and account access saves", () => {
+  it("allows Closer and Hybrid sales visibility and submits a plain full catalog", async () => {
+    mocks.visibilityMutate.mockResolvedValue({ configured: true, version: 2, roleIdsByModule: {} });
+    const client = new QueryClient({ defaultOptions: { mutations: { retry: false }, queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><VisibilityEditor
+      roles={[
+        { id: "role-closer", name: "Closer", effectivePermissions: ["sales:*"] },
+        { id: "role-caller-closer", name: "Híbrido", effectivePermissions: ["sales:*"] },
+        { id: "role-admin", name: "Admin", effectivePermissions: ["*"] },
+      ]}
+      version={1}
+      configured
+      roleIdsByModule={{ "closer-sales": [], "users-access": ["role-admin"] }}
+    /></QueryClientProvider>);
+    const closerSales = screen.getByLabelText("Ventas closer: Closer");
+    expect(closerSales).toBeEnabled();
+    fireEvent.click(closerSales);
+    fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+    await waitFor(() => expect(mocks.visibilityMutate).toHaveBeenCalledOnce());
+    const input = mocks.visibilityMutate.mock.calls[0]?.[0];
+    expect(input.entries).toHaveLength(16);
+    expect(input.entries.find((entry: { moduleId: string }) => entry.moduleId === "closer-sales").roleIds).toContain("role-closer");
+  });
+
+  it("uses CAS state when approving a pending user", async () => {
+    mocks.accessMutate.mockResolvedValue({ id: "u1", accessStatus: "active", statusVersion: 2 });
+    const client = new QueryClient({ defaultOptions: { mutations: { retry: false }, queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><AccessStatusEditor userId="u1" name="Ana" status="pending" version={1} /></QueryClientProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "Aprobar" }));
+    await waitFor(() => expect(mocks.accessMutate.mock.calls[0]?.[0]).toEqual({ userId: "u1", action: "approve", expectedStatus: "pending", expectedVersion: 1 }));
   });
 });

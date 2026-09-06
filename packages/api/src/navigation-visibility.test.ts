@@ -6,6 +6,7 @@ import {
   roleCanAccessNavigationModule,
   validateNavigationVisibility,
 } from "./navigation-visibility";
+import { normalizePermissions } from "./permissions";
 
 const roles = [
   { id: "role-caller", permissions: ["leads:*", "alerts:read"] as const },
@@ -23,7 +24,9 @@ function fullEntries() {
 
 describe("navigation visibility validation", () => {
   it("accepts only a complete closed module and role catalog", () => {
-    expect(validateNavigationVisibility(fullEntries(), roles)["general-leads"]).toEqual(["role-admin", "role-caller", "role-caller-closer", "role-closer"]);
+    const validated = validateNavigationVisibility(fullEntries(), roles);
+    expect(Object.getPrototypeOf(validated)).toBe(Object.prototype);
+    expect(validated["general-leads"]).toEqual(["role-admin", "role-caller", "role-caller-closer", "role-closer"]);
     expect(() => validateNavigationVisibility(fullEntries().slice(1), roles)).toThrowError(NavigationVisibilityValidationError);
     expect(() => validateNavigationVisibility([...fullEntries().slice(0, -1), { moduleId: "arbitrary-route", roleIds: [] }], roles)).toThrow("catálogo");
     expect(() => validateNavigationVisibility(fullEntries().map((entry) => entry.moduleId === "dashboard" ? { ...entry, roleIds: [...entry.roleIds, "missing-role"] } : entry), roles)).toThrow("rol no existe");
@@ -40,6 +43,11 @@ describe("navigation visibility validation", () => {
   });
 
   it("makes closer sales visible only to roles with sales access", () => {
+    expect(normalizePermissions(["sales:read", "sales:write", "sales:*", "unknown"])).toEqual([
+      "sales:*",
+      "sales:read",
+      "sales:write",
+    ]);
     expect(validateNavigationVisibility(fullEntries(), roles)["closer-sales"]).toEqual([
       "role-admin",
       "role-caller-closer",

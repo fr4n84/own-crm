@@ -2,6 +2,7 @@ import { t } from "../index";
 import { TRPCError } from "@trpc/server";
 import { hasPermission } from "../permissions";
 import type { Permission } from "@crm-fran/db/schema/auth";
+import { assertActiveAccount } from "./account-access";
 
 export const permittedProcedure = (
   permissionRequired: Permission[],
@@ -14,6 +15,8 @@ export const permittedProcedure = (
         cause: "No session",
       });
     }
+
+    assertActiveAccount(ctx.session.user);
 
     if (!ctx.permissions) {
       throw new TRPCError({

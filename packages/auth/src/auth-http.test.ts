@@ -19,13 +19,25 @@ async function request(path: string, body: unknown, cookie?: string) {
   }));
 }
 const account = { name: "Test User", email: "test@example.com", password: "safe-test-password" };
+async function activateAndSignIn(roleId = "role-caller") {
+  const signup = await request("sign-up/email", { ...account, roleId });
+  expect(signup.status).toBe(200);
+  expect(await signup.json()).toMatchObject({ token: null, user: { accessStatus: "pending", roleId } });
+  const storedUser = memory.user[0];
+  if (!storedUser) throw new Error("Expected a registered account");
+  Object.assign(storedUser, { accessStatus: "active", statusVersion: 2 });
+  const signIn = await request("sign-in/email", { email: account.email, password: account.password });
+  expect(signIn.status).toBe(200);
+  return { storedUser, cookie: signIn.headers.getSetCookie().map((value) => value.split(";")[0]).join("; ") };
+}
 describe("configured Better Auth HTTP role boundaries (memory adapter)", () => {
   beforeEach(() => { for (const rows of Object.values(memory)) rows.length = 0; });
   for (const roleId of ["role-caller", "role-closer", "role-caller-closer"]) {
     it(`registers ${roleId} through the public endpoint`, async () => {
       const response = await request("sign-up/email", { ...account, roleId });
       expect(response.status).toBe(200);
-      expect(await response.json()).toMatchObject({ user: { roleId } });
+      expect(await response.json()).toMatchObject({ token: null, user: { roleId, accessStatus: "pending" } });
+      expect(memory.session).toHaveLength(0);
     });
   }
   for (const roleId of ["role-admin", "unknown"]) {
@@ -36,18 +48,14 @@ describe("configured Better Auth HTTP role boundaries (memory adapter)", () => {
     });
   }
   it("rejects update-user escalation while ordinary profile edits work", async () => {
-    const signup = await request("sign-up/email", { ...account, roleId: "role-caller" });
-    const cookie = signup.headers.getSetCookie().map((value) => value.split(";")[0]).join("; ");
+    const { cookie } = await activateAndSignIn();
     expect(cookie).not.toBe("");
     expect((await request("update-user", { roleId: "role-admin" }, cookie)).status).toBe(403);
     expect((await request("update-user", { name: "Updated name" }, cookie)).status).toBe(200);
     expect(memory.user[0]).toMatchObject({ roleId: "role-caller", name: "Updated name" });
   });
   it("keeps existing admin profile edits working and reads current persisted roles", async () => {
-    const signup = await request("sign-up/email", { ...account, roleId: "role-caller" });
-    const cookie = signup.headers.getSetCookie().map((value) => value.split(";")[0]).join("; ");
-    const storedUser = memory.user[0];
-    if (!storedUser) throw new Error("Expected a registered account");
+    const { cookie, storedUser } = await activateAndSignIn();
     // Seed an existing administrator directly in the isolated adapter.
     Object.assign(storedUser, { roleId: "role-admin" });
     expect((await request("update-user", { name: "Updated admin" }, cookie)).status).toBe(200);
@@ -55,13 +63,23 @@ describe("configured Better Auth HTTP role boundaries (memory adapter)", () => {
     const session = await auth.handler(new Request("http://localhost:3001/api/auth/get-session", { headers: { cookie } }));
     expect(await session.json()).toMatchObject({ user: { roleId: "role-admin" } });
   });
+  it("keeps pending and disabled users out while active users can sign in", async () => {
+    const signup = await request("sign-up/email", { ...account, roleId: "role-closer" });
+    expect(signup.status).toBe(200);
+    expect((await request("sign-in/email", { email: account.email, password: account.password })).status).toBe(403);
+    const storedUser = memory.user[0];
+    if (!storedUser) throw new Error("Expected a registered account");
+    Object.assign(storedUser, { accessStatus: "active", statusVersion: 2 });
+    expect((await request("sign-in/email", { email: account.email, password: account.password })).status).toBe(200);
+    Object.assign(storedUser, { accessStatus: "disabled", statusVersion: 3 });
+    expect((await request("sign-in/email", { email: account.email, password: account.password })).status).toBe(403);
+  });
 });
 
 describe("configured password change", () => {
  beforeEach(() => { for(const rows of Object.values(memory)) rows.length=0; });
  it("requires current password and revokes other sessions", async () => {
-  const signup=await request("sign-up/email",{...account,roleId:"role-caller"});
-  const cookie=signup.headers.getSetCookie().map(v=>v.split(";")[0]).join("; ");
+  const { cookie }=await activateAndSignIn();
   await request("sign-in/email",{email:account.email,password:account.password});
   expect(memory.session.length).toBe(2);
   expect((await request("change-password",{currentPassword:"wrong",newPassword:"changed-safe-password",revokeOtherSessions:true},cookie)).status).not.toBe(200);

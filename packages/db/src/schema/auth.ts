@@ -7,7 +7,10 @@ import {
   index,
   integer,
   json,
+  check,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { leads } from "./leads";
 
 export const ROLE_ID = {
@@ -33,31 +36,26 @@ export function isCloserRoleId(roleId: string | null | undefined) {
   return roleId === ROLE_ID.CLOSER || roleId === ROLE_ID.COMBINED;
 }
 
-export type Permission =
-  | "leads:read"
-  | "leads:write"
-  | "leads:delete"
-  | "leads:*"
-  | "reports:read"
-  | "users:*"
-  | "users:read"
-  | "users:write"
-  | "users:delete"
-  | "users:create"
-  | "users:update"
-  | "profile:read"
-  | "profile:write"
-  | "profile:*"
-  | "alerts:read"
-  | "alerts:write"
-  | "alerts:delete"
-  | "alerts:*"
-  | "settings:read"
-  | "settings:write"
-  | "sales:read"
-  | "sales:write"
-  | "sales:*"
-  | "*";
+export const PERMISSION_VALUES = [
+  "leads:read", "leads:write", "leads:delete", "leads:*",
+  "reports:read",
+  "users:*", "users:read", "users:write", "users:delete", "users:create", "users:update",
+  "profile:read", "profile:write", "profile:*",
+  "alerts:read", "alerts:write", "alerts:delete", "alerts:*",
+  "settings:read", "settings:write",
+  "sales:read", "sales:write", "sales:*",
+  "*",
+] as const;
+
+export type Permission = (typeof PERMISSION_VALUES)[number];
+
+export const USER_ACCESS_STATUS = {
+  PENDING: "pending",
+  ACTIVE: "active",
+  DISABLED: "disabled",
+} as const;
+
+export type UserAccessStatus = (typeof USER_ACCESS_STATUS)[keyof typeof USER_ACCESS_STATUS];
 
 export type ResolvedRole = {
   id: string;
@@ -77,12 +75,42 @@ export const user = pgTable("user", {
     .notNull(),
   leadActive: text("lead_active"),
   scoring: integer("scoring"),
+  accessStatus: text("access_status").$type<UserAccessStatus>().default(USER_ACCESS_STATUS.PENDING).notNull(),
+  statusVersion: integer("status_version").default(1).notNull(),
+  accessStatusChangedAt: timestamp("access_status_changed_at").defaultNow().notNull(),
+  accessStatusChangedById: text("access_status_changed_by_id").references((): AnyPgColumn => user.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
-});
+}, (table) => [
+  check("user_access_status_check", sql`${table.accessStatus} IN ('pending','active','disabled')`),
+  check("user_status_version_check", sql`${table.statusVersion} >= 1`),
+]);
+
+export const USER_ACCESS_AUDIT_ACTION = {
+  APPROVED: "approved",
+  DISABLED: "disabled",
+  REACTIVATED: "reactivated",
+} as const;
+
+export const userAccessAudit = pgTable("user_access_audit", {
+  id: text("id").primaryKey(),
+  targetUserId: text("target_user_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+  actorUserId: text("actor_user_id").references(() => user.id, { onDelete: "set null" }),
+  action: text("action").notNull(),
+  previousStatus: text("previous_status").$type<UserAccessStatus>().notNull(),
+  nextStatus: text("next_status").$type<UserAccessStatus>().notNull(),
+  statusVersion: integer("status_version").notNull(),
+  reason: text("reason"),
+  occurredAt: timestamp("occurred_at").defaultNow().notNull(),
+}, (table) => [
+  index("user_access_audit_target_idx").on(table.targetUserId),
+  index("user_access_audit_actor_idx").on(table.actorUserId),
+  check("user_access_audit_action_check", sql`${table.action} IN ('approved','disabled','reactivated')`),
+  check("user_access_audit_status_version_check", sql`${table.statusVersion} >= 2`),
+]);
 
 export const roles = pgTable("roles", {
   id: text("id").primaryKey(),
