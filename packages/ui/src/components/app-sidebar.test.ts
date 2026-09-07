@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { canViewNavigationItem, observatoryNavigationUrl } from "./app-sidebar";
+import { canViewNavigationItem, getSidebarNavigation, observatoryNavigationUrl } from "./app-sidebar";
 import { readFileSync } from "node:fs";
+import { PRIMARY_NAVIGATION_ITEMS } from "../lib/navigation-policy";
 
 const navigationSource = readFileSync(new URL("../lib/navigation-policy.ts", import.meta.url), "utf8");
 
@@ -32,6 +33,36 @@ describe("app sidebar decision-center visibility", () => {
     expect(source).not.toContain("NavSecondary");
     expect(source).toContain("<NavUser user={user} onSignOut={onSignOut} onAccount={onAccount} />");
     expect(source.indexOf('href="/sugerencias"')).toBeLessThan(source.indexOf("<NavUser"));
+  });
+  it("places Messages in the footer before Suggestions without changing role visibility", () => {
+    const roles = [
+      ["role-caller", ["leads:*", "alerts:*", "users:read"]],
+      ["role-closer", ["leads:*", "alerts:*", "sales:*"]],
+      ["role-caller-closer", ["leads:*", "alerts:*", "users:read", "sales:*"]],
+      ["role-admin", ["*"]],
+    ] as const;
+
+    for (const [roleId, permissions] of roles) {
+      const navigation = getSidebarNavigation(PRIMARY_NAVIGATION_ITEMS, roleId, permissions);
+      expect(navigation.groups.flatMap((group) => group.items).some((item) => item.id === "messages")).toBe(false);
+      expect(navigation.messages?.id).toBe("messages");
+      expect(navigation.groups.every((group) => group.items.length > 0)).toBe(true);
+      expect(navigation.groups.map((group) => group.label).slice(0, 2)).toEqual(["Operación", "Análisis"]);
+    }
+
+    const admin = getSidebarNavigation(PRIMARY_NAVIGATION_ITEMS, "role-admin", ["*"]);
+    expect(admin.groups.map((group) => group.label)).toEqual(["Operación", "Análisis", "Administración"]);
+
+    const hidden = getSidebarNavigation(PRIMARY_NAVIGATION_ITEMS, "role-caller", ["leads:*", "alerts:*", "users:read"], {
+      roleIdsByModule: { messages: ["role-closer", "role-caller-closer", "role-admin"] },
+    });
+    expect(hidden.messages).toBeUndefined();
+
+    const source = readFileSync(new URL("./app-sidebar.tsx", import.meta.url), "utf8");
+    expect(source.indexOf('href={navigation.messages.url}')).toBeLessThan(source.indexOf('href="/sugerencias"'));
+    expect(source.indexOf('href="/sugerencias"')).toBeLessThan(source.indexOf("<NavUser"));
+    expect(source).toContain('collapsible="offcanvas"');
+    expect(source).not.toContain("Collapsible");
   });
   it("uses Aurea as the visible product name", () => {
     const source = readFileSync(new URL("./app-sidebar.tsx", import.meta.url), "utf8");

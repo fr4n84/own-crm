@@ -22,7 +22,7 @@ export const NAVIGATION_MODULE_IDS = [
 export type NavigationModuleId = (typeof NAVIGATION_MODULE_IDS)[number];
 
 export const NAVIGATION_MODULE_CATALOG = [
-  { id: "dashboard" },
+  { id: "dashboard", requiredPermission: "leads:read" },
   { id: "decision-center", globalOnly: true },
   { id: "next-best-action", requiredPermission: "alerts:read" },
   { id: "commercial-observatory", requiredPermission: "leads:read" },

@@ -2,7 +2,7 @@
 
 import * as React from "react"
 
-import { NavMain } from "@crm-fran/ui/components/nav-main"
+import { isNavigationItemActive, NavMain } from "@crm-fran/ui/components/nav-main"
 import { NavUser } from "@crm-fran/ui/components/nav-user"
 import {
   Sidebar,
@@ -34,6 +34,39 @@ export function canViewNavigationItem(
 
 export function observatoryNavigationUrl(permissions: readonly Permission[]) {
   return permissions.includes("*") ? "/observatorio-comercial" : "/observatorio-comercial/evidencia-comercial"
+}
+
+const SIDEBAR_NAVIGATION_GROUPS = [
+  {
+    label: "Operación",
+    itemIds: ["general-leads", "vsl-leads", "personal-leads", "whatsapp", "closer-sales", "alerts", "agendas", "calendar"],
+  },
+  {
+    label: "Análisis",
+    itemIds: ["dashboard", "next-best-action", "commercial-observatory", "profitability", "personal-statistics"],
+  },
+  {
+    label: "Administración",
+    itemIds: ["decision-center", "users-access"],
+  },
+] as const
+
+export function getSidebarNavigation<T extends PrimaryNavigationItem>(
+  items: readonly T[],
+  roleId: string | null | undefined,
+  permissions: readonly Permission[],
+  navigationVisibility?: NavigationVisibilityConfiguration,
+) {
+  const visible = presentNavigationForRole(
+    items.filter((item) => canViewConfiguredNavigationItem(item, roleId, permissions, navigationVisibility)),
+    roleId,
+  )
+  const messages = visible.find((item) => item.id === "messages")
+  const groups = SIDEBAR_NAVIGATION_GROUPS.map((group) => ({
+    label: group.label,
+    items: visible.filter((item) => (group.itemIds as readonly string[]).includes(item.id)),
+  })).filter((group) => group.items.length > 0)
+  return { groups, messages }
 }
 
 const NAVIGATION_ICONS: Record<PrimaryNavigationItem["id"], React.ReactNode> = {
@@ -166,6 +199,7 @@ export function AppSidebar({
 }) {
   const permissions = usePermissions()
   const role = useRole()
+  const navigation = getSidebarNavigation(data.navMain, role?.id, permissions, navigationVisibility)
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -181,18 +215,30 @@ export function AppSidebar({
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
-      <SidebarContent>
-        <NavMain
-          items={presentNavigationForRole(data.navMain
-            .filter((item) => canViewConfiguredNavigationItem(item, role?.id, permissions, navigationVisibility)), role?.id)
-            .map((item) => item.url === "/observatorio-comercial" ? { ...item, url: observatoryNavigationUrl(permissions) } : item)}
-          LinkComponent={LinkComponent}
-          currentPathname={currentPathname}
-        />
+      <SidebarContent className="gap-1 py-1">
+        {navigation.groups.map((group) => (
+          <NavMain
+            key={group.label}
+            label={group.label}
+            items={group.items.map((item) => item.url === "/observatorio-comercial" ? { ...item, url: observatoryNavigationUrl(permissions) } : item)}
+            LinkComponent={LinkComponent}
+            currentPathname={currentPathname}
+          />
+        ))}
         {/* <NavDocuments items={data.documents} /> */}
       </SidebarContent>
       {user ? <SidebarFooter>
         <SidebarMenu>
+          {navigation.messages ? <SidebarMenuItem>
+            <SidebarMenuButton
+              tooltip={navigation.messages.title}
+              render={<LinkComponent href={navigation.messages.url} />}
+              isActive={isNavigationItemActive(currentPathname, navigation.messages.url)}
+              className="text-sm"
+            >
+              {navigation.messages.icon}<span>{navigation.messages.title}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem> : null}
           <SidebarMenuItem>
             <SidebarMenuButton tooltip="Sugerencias" render={<LinkComponent href="/sugerencias" />} className="text-sm">
               <LightbulbIcon /><span>Sugerencias</span>

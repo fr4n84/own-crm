@@ -34,7 +34,7 @@ export type PrimaryNavigationItem = {
  * security authority for every operation.
  */
 export const PRIMARY_NAVIGATION_ITEMS = [
-  { id: "dashboard", title: "Dashboard", url: "/" },
+  { id: "dashboard", title: "Dashboard", url: "/", requiredPermission: "leads:read" },
   { id: "decision-center", title: "Centro de decisiones", url: "/centro-de-decisiones", globalOnly: true },
   { id: "next-best-action", title: "Próxima mejor acción", url: "/next-best-action", requiredPermission: "alerts:read" },
   { id: "commercial-observatory", title: "Observatorio comercial", url: "/observatorio-comercial", requiredPermission: "leads:read" },

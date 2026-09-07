@@ -3,6 +3,7 @@
 import {
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -19,6 +20,7 @@ export function NavMain({
   items,
   LinkComponent = "a",
   currentPathname,
+  label,
 }: {
   items: {
     title: string
@@ -27,11 +29,13 @@ export function NavMain({
   }[]
   LinkComponent?: React.ComponentType<any> | string
   currentPathname?: string
+  label?: string
 }) {
   const { isMobile, setOpenMobile } = useSidebar()
 
   return (
     <SidebarGroup>
+      {label ? <SidebarGroupLabel className="px-2 text-[0.7rem] font-semibold uppercase tracking-wide">{label}</SidebarGroupLabel> : null}
       <SidebarGroupContent className="flex flex-col gap-2">
         {/* <SidebarMenu>
           <SidebarMenuItem className="flex items-center gap-2">

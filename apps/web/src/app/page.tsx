@@ -1,16 +1,23 @@
-import { auth } from "@crm-fran/auth";
+import { createContext } from "@crm-fran/api/context";
+import { assertDashboardAccess } from "@crm-fran/api/dashboard/access";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Dashboard from "@/components/dashboard";
 
 
 export default async function DashboardPage() {
-  const session = await auth.api.getSession({
+  const context = await createContext({
     headers: await headers(),
   });
 
-  if (!session?.user) {
+  if (!context.session) {
     redirect("/login");
+  }
+
+  try {
+    await assertDashboardAccess(context.role?.id, context.permissions);
+  } catch {
+    redirect("/perfil");
   }
 
   return (

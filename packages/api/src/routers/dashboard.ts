@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { madridDayKey } from "../commercial-observatory/domain";
 import { getDashboardSummary } from "../dashboard/dashboard-summary";
+import { assertDashboardAccess } from "../dashboard/access";
 import { getConversionFunnel } from "../dashboard/conversion-funnel-service";
 import {
   getQualityControls,
@@ -76,17 +77,27 @@ const qualitySettingsInput = z.object({
   closerLowConversionPercent: z.number().int().min(0).max(100),
 });
 
+const dashboardReadProcedure = permittedProcedure(["leads:read"]).use(async ({ ctx, next }) => {
+  await assertDashboardAccess(ctx.role?.id, ctx.permissions);
+  return next();
+});
+
+const dashboardSettingsProcedure = permittedProcedure(["settings:write"]).use(async ({ ctx, next }) => {
+  await assertDashboardAccess(ctx.role?.id, ctx.permissions);
+  return next();
+});
+
 export const dashboardRouter = router({
-  summary: permittedProcedure(["leads:read"])
+  summary: dashboardReadProcedure
     .input(dashboardSummaryInput)
     .query(({ input }) => getDashboardSummary(input)),
-  conversionFunnel: permittedProcedure(["leads:read"])
+  conversionFunnel: dashboardReadProcedure
     .input(conversionFunnelInput)
     .query(({ input }) => getConversionFunnel(input)),
-  qualityControls: permittedProcedure(["leads:read"])
+  qualityControls: dashboardReadProcedure
     .input(qualityControlsInput)
     .query(({ input }) => getQualityControls(input)),
-  updateQualitySettings: permittedProcedure(["settings:write"])
+  updateQualitySettings: dashboardSettingsProcedure
     .input(qualitySettingsInput)
     .mutation(({ ctx, input }) => updateQualitySettings(ctx.session.user.id, input)),
 });
