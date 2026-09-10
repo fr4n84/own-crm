@@ -1,6 +1,6 @@
 import { z } from "zod/v4";
 
-import { listCloserSales, updateCloserSaleRecord } from "../closer-sales/service";
+import { listCloserSales, updateCloserSaleRecord, voidCloserSale } from "../closer-sales/service";
 import { paymentReconciliationService } from "../payment-reconciliation/service";
 import { router } from "../index";
 import { permittedProcedure } from "../trpc/trpc";
@@ -64,6 +64,11 @@ export const closerSaleUpdateInput = z.object({
   path: ["amountPaidCents"],
 });
 
+export const closerSaleVoidInput = z.object({
+  leadId: z.string().min(1),
+  reason: z.string().trim().min(1).max(1_000),
+  operationId: z.uuid(),
+});
 export const closerSalesRouter = router({
   list: permittedProcedure(["sales:read"]).query(() => listCloserSales()),
   update: permittedProcedure(["sales:write"])
@@ -72,6 +77,12 @@ export const closerSalesRouter = router({
       ...input,
       currency: "EUR",
       soldAt: new Date(`${input.soldOn}T12:00:00.000Z`),
+      actorId: ctx.session.user.id,
+    })),
+  void: permittedProcedure(["*"])
+    .input(closerSaleVoidInput)
+    .mutation(({ ctx, input }) => voidCloserSale({
+      ...input,
       actorId: ctx.session.user.id,
     })),
   reconciliationProfiles: permittedProcedure(["*"]).query(() => paymentReconciliationService.listProfiles()),

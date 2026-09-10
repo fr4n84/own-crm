@@ -1,7 +1,7 @@
 import { alias, and, db, eq, inArray, sql } from "@crm-fran/db";
 import { previewProviderPayments } from "@crm-fran/db/reconciliation/payment-import";
 import {
-  closerSaleRecords, leadFinancialEvents, leads, paymentProviderProfiles,
+  closerSaleRecords, closerSaleVoids, leadFinancialEvents, leads, paymentProviderProfiles,
   paymentReconciliationAllocations, paymentReconciliationBatches,
   paymentReconciliations, receivableAccounts, receivableInstallments, user,
 } from "@crm-fran/db/schema/index";
@@ -101,6 +101,8 @@ async function confirmRow(tx: Transaction, input: { externalReference: string; a
   await tx.execute(sql`select lead_id from closer_sale_records where lead_id = ${input.leadId} for update`);
   const [sale] = await tx.select().from(closerSaleRecords).where(eq(closerSaleRecords.leadId, input.leadId)).limit(1);
   if (!sale) throw new TRPCError({ code: "NOT_FOUND", message: "La coincidencia no tiene una venta gestionable." });
+  const [voided] = await tx.select({ leadId: closerSaleVoids.leadId }).from(closerSaleVoids).where(eq(closerSaleVoids.leadId, input.leadId)).limit(1);
+  if (voided) throw new TRPCError({ code: "CONFLICT", message: "La venta está anulada y no admite conciliaciones nuevas." });
   if (sale.currency !== input.currency) throw new TRPCError({ code: "BAD_REQUEST", message: "La moneda del cobro no coincide con la cuenta por cobrar." });
   const newPaidCents = sale.amountPaidCents + input.amountCents;
   if (newPaidCents > sale.saleAmountCents) throw new TRPCError({ code: "BAD_REQUEST", message: "El cobro supera el saldo pendiente de la venta." });

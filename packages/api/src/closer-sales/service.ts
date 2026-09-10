@@ -1,14 +1,17 @@
-import { alias, db, eq, sql } from "@crm-fran/db";
+import { alias, and, db, eq, isNull, sql } from "@crm-fran/db";
 import {
   closerSaleRecords,
+  closerSaleVoids,
   leadFinancialEvents,
   leads,
+  receivableInstallments,
   user,
 } from "@crm-fran/db/schema/index";
 import { TRPCError } from "@trpc/server";
 
 import { classifySaleEvidence } from "./domain";
 import { buildSaleFinancialPlan } from "./financial-plan";
+import { executeVoidCloserSale, type VoidCloserSaleStore } from "./void-sale";
 import { listReceivableSummaries, syncReceivableAccount } from "../receivables/service";
 
 export type ContractFileInput = {
@@ -59,7 +62,12 @@ export async function listCloserSales() {
     .from(leads)
     .leftJoin(caller, eq(caller.id, leads.callerId))
     .leftJoin(closer, eq(closer.id, leads.closerId))
-    .leftJoin(closerSaleRecords, eq(closerSaleRecords.leadId, leads.id));
+    .leftJoin(closerSaleRecords, eq(closerSaleRecords.leadId, leads.id))
+    .leftJoin(closerSaleVoids, eq(closerSaleVoids.leadId, leads.id))
+    .where(and(
+      isNull(leads.mergedIntoLeadId),
+      isNull(closerSaleVoids.leadId),
+    ));
 
   const receivables = await listReceivableSummaries();
   return rows.flatMap((row) => {
@@ -102,12 +110,20 @@ export async function updateCloserSaleRecord(input: {
   return db.transaction(async (tx) => {
     await tx.execute(sql`select id from leads where id = ${input.leadId} for update`);
     const [lead] = await tx
-      .select({ id: leads.id, feedback: leads.feedback, questions: leads.questions })
+      .select({ id: leads.id, feedback: leads.feedback, questions: leads.questions, mergedIntoLeadId: leads.mergedIntoLeadId })
       .from(leads)
       .where(eq(leads.id, input.leadId))
       .limit(1);
-    if (!lead || !classifySaleEvidence(lead)) {
+    if (!lead || lead.mergedIntoLeadId !== null || !classifySaleEvidence(lead)) {
       throw new TRPCError({ code: "NOT_FOUND", message: "La venta no existe" });
+    }
+    const [voided] = await tx
+      .select({ leadId: closerSaleVoids.leadId })
+      .from(closerSaleVoids)
+      .where(eq(closerSaleVoids.leadId, input.leadId))
+      .limit(1);
+    if (voided) {
+      throw new TRPCError({ code: "CONFLICT", message: "La venta está anulada." });
     }
     const [current] = await tx
       .select()
@@ -256,5 +272,121 @@ export async function updateCloserSaleRecord(input: {
       paymentEventId: paymentReceivedEventId,
     });
     return record!;
+  });
+}
+
+export async function voidCloserSale(input: {
+  leadId: string;
+  actorId: string;
+  reason: string;
+  operationId: string;
+}) {
+  return db.transaction(async (tx) => {
+    const store: VoidCloserSaleStore = {
+      async lockSaleEvidence(leadId) {
+        const [lead] = await tx
+          .select({
+            id: leads.id,
+            feedback: leads.feedback,
+            questions: leads.questions,
+            mergedIntoLeadId: leads.mergedIntoLeadId,
+          })
+          .from(leads)
+          .where(eq(leads.id, leadId))
+          .limit(1)
+          .for("update");
+        if (!lead) return null;
+
+        const [record] = await tx
+          .select({
+            saleAmountCents: closerSaleRecords.saleAmountCents,
+            amountPaidCents: closerSaleRecords.amountPaidCents,
+            currency: closerSaleRecords.currency,
+            soldAt: closerSaleRecords.soldAt,
+            paymentMethod: closerSaleRecords.paymentMethod,
+            financingProvider: closerSaleRecords.financingProvider,
+            installmentMonths: closerSaleRecords.installmentMonths,
+          })
+          .from(closerSaleRecords)
+          .where(eq(closerSaleRecords.leadId, leadId))
+          .limit(1)
+          .for("update");
+
+        return { ...lead, record: record ?? null };
+      },
+      async findByOperationId(operationId) {
+        const [stored] = await tx
+          .select()
+          .from(closerSaleVoids)
+          .where(eq(closerSaleVoids.operationId, operationId))
+          .limit(1);
+        return stored ?? null;
+      },
+      async findByLeadId(leadId) {
+        const [stored] = await tx
+          .select()
+          .from(closerSaleVoids)
+          .where(eq(closerSaleVoids.leadId, leadId))
+          .limit(1);
+        return stored ?? null;
+      },
+      async listUnreversedFinancialEvents(leadId) {
+        const events = await tx
+          .select({
+            id: leadFinancialEvents.id,
+            kind: leadFinancialEvents.kind,
+            amountCents: leadFinancialEvents.amountCents,
+            currency: leadFinancialEvents.currency,
+            reversalOfId: leadFinancialEvents.reversalOfId,
+          })
+          .from(leadFinancialEvents)
+          .where(eq(leadFinancialEvents.leadId, leadId));
+        const reversedIds = new Set(
+          events.flatMap((event) => event.reversalOfId ? [event.reversalOfId] : []),
+        );
+        return events
+          .filter((event) => event.kind !== "reversal" && !reversedIds.has(event.id))
+          .map(({ id, amountCents, currency }) => ({ id, amountCents, currency }));
+      },
+      async appendReversal(event) {
+        await tx.insert(leadFinancialEvents).values({
+          id: crypto.randomUUID(),
+          leadId: event.leadId,
+          kind: "reversal",
+          amountCents: event.amountCents,
+          currency: event.currency,
+          occurredAt: event.occurredAt,
+          createdById: event.actorId,
+          idempotencyKey: "closer-sale-void:" + event.operationId + ":reverse:" + event.originalEventId,
+          note: "Anulación auditada desde Ventas closer",
+          externalReference: "closer-sale:" + event.leadId,
+          reversalOfId: event.originalEventId,
+        });
+      },
+      async supersedeActiveInstallments({ leadId, occurredAt }) {
+        await tx
+          .update(receivableInstallments)
+          .set({ supersededAt: occurredAt })
+          .where(and(
+            eq(receivableInstallments.leadId, leadId),
+            isNull(receivableInstallments.supersededAt),
+          ));
+      },
+      async insertVoid(values) {
+        const [stored] = await tx
+          .insert(closerSaleVoids)
+          .values(values)
+          .returning();
+        if (!stored) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "No se pudo registrar la anulación.",
+          });
+        }
+        return stored;
+      },
+    };
+
+    return executeVoidCloserSale(store, input);
   });
 }

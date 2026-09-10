@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { Badge } from "@crm-fran/ui/components/badge";
 import { Button } from "@crm-fran/ui/components/button";
+import { Can } from "@crm-fran/ui/permissions/can";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@crm-fran/ui/components/card";
 import { Checkbox } from "@crm-fran/ui/components/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@crm-fran/ui/components/dialog";
@@ -23,6 +24,7 @@ import { describeReceivable, formatReceivableMoney } from "./receivable-label";
 import { PaymentReconciliationPanel } from "./payment-reconciliation-panel";
 import { AdminExportPanel } from "./admin-export-panel";
 import { formatSalePaymentPlan } from "./sale-payment-label";
+import { SaleVoidDialog } from "./sale-void-dialog";
 
 type ContractFile = {
   storageKey: string;
@@ -80,6 +82,13 @@ export function CloserSalesView() {
     onError: (error) => toast.error(error.message),
   }));
 
+  const voidSale = useMutation(trpc.closerSales.void.mutationOptions({
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: trpc.closerSales.list.queryKey() });
+      toast.success("Venta anulada");
+    },
+    onError: (error) => toast.error(error.message),
+  }));
   const rows = sales.data ?? [];
   const totals = totalsByCurrency(rows);
   const openEditor = (sale: (typeof rows)[number]) => setEditor({
@@ -216,7 +225,7 @@ export function CloserSalesView() {
                   <TableCell><Badge variant={sale.saleEvidence === "confirmed" ? "secondary" : "outline"}>{sale.saleEvidence === "confirmed" ? "Confirmada" : "Dato heredado parcial"}</Badge></TableCell>
                   <TableCell>{sale.record?.contractUrl ? <Button variant="outline" size="sm" render={<a href={sale.record.contractUrl} target="_blank" rel="noreferrer" />}><FileTextIcon data-icon="inline-start" />Ver contrato</Button> : "Pendiente"}</TableCell>
                   <TableCell><Badge variant={sale.record?.onboardingCompleted ? "secondary" : "outline"}>{sale.record?.onboardingCompleted ? "Realizado" : "Pendiente"}</Badge></TableCell>
-                  <TableCell><div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" onClick={() => openEditor(sale)}><PencilIcon data-icon="inline-start" />Gestionar</Button>{sale.record?.salesCallUrl ? <Button variant="ghost" size="sm" render={<a href={sale.record.salesCallUrl} target="_blank" rel="noreferrer" />}><ExternalLinkIcon data-icon="inline-start" />Llamada</Button> : null}{sale.record?.onboardingVideoUrl ? <Button variant="ghost" size="sm" render={<a href={sale.record.onboardingVideoUrl} target="_blank" rel="noreferrer" />}><ExternalLinkIcon data-icon="inline-start" />Onboarding</Button> : null}</div></TableCell>
+                  <TableCell><div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" onClick={() => openEditor(sale)}><PencilIcon data-icon="inline-start" />Gestionar</Button>{sale.record?.salesCallUrl ? <Button variant="ghost" size="sm" render={<a href={sale.record.salesCallUrl} target="_blank" rel="noreferrer" />}><ExternalLinkIcon data-icon="inline-start" />Llamada</Button> : null}{sale.record?.onboardingVideoUrl ? <Button variant="ghost" size="sm" render={<a href={sale.record.onboardingVideoUrl} target="_blank" rel="noreferrer" />}><ExternalLinkIcon data-icon="inline-start" />Onboarding</Button> : null}<Can permission="*"><SaleVoidDialog leadName={sale.name} pending={voidSale.isPending} onConfirm={(voidInput) => voidSale.mutateAsync({ leadId: sale.id, ...voidInput })} /></Can></div></TableCell>
                 </TableRow>
               ))}</TableBody>
             </Table>

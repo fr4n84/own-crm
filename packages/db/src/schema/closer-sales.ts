@@ -3,9 +3,11 @@ import {
   boolean,
   check,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 import { user } from "./auth";
@@ -76,6 +78,43 @@ export const closerSaleRecords = pgTable(
   ],
 );
 
+export type CloserSaleVoidSnapshot = {
+  evidence: "confirmed" | "legacy_partial";
+  saleAmountCents: number | null;
+  amountPaidCents: number | null;
+  currency: string | null;
+  soldAt: string | null;
+  paymentMethod: SalePaymentMethod | null;
+  financingProvider: string | null;
+  installmentMonths: number | null;
+};
+
+export const closerSaleVoids = pgTable(
+  "closer_sale_voids",
+  {
+    leadId: text("lead_id")
+      .primaryKey()
+      .references(() => leads.id, { onDelete: "restrict" }),
+    actorId: text("actor_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    reason: text("reason").notNull(),
+    operationId: text("operation_id").notNull(),
+    snapshot: jsonb("snapshot").$type<CloserSaleVoidSnapshot>().notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("closer_sale_voids_operation_uidx").on(table.operationId),
+    check(
+      "closer_sale_voids_reason_chk",
+      sql`char_length(btrim(${table.reason})) BETWEEN 1 AND 1000`,
+    ),
+    check(
+      "closer_sale_voids_operation_uuid_chk",
+      sql`${table.operationId} ~* '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'`,
+    ),
+  ],
+);
 export const closerSaleRecordsRelations = relations(closerSaleRecords, ({ one }) => ({
   lead: one(leads, {
     fields: [closerSaleRecords.leadId],

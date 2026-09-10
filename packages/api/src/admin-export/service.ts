@@ -1,6 +1,6 @@
 import { and, db, eq, gte, inArray, lte, sql } from "@crm-fran/db";
 import {
-  adminDataExports, calendarEvents, closerSaleRecords, leadActivityEvents,
+  adminDataExports, calendarEvents, closerSaleRecords, closerSaleVoids, leadActivityEvents,
   leadFinancialEvents, leads, paymentProviderProfiles, paymentReconciliationAllocations,
   paymentReconciliationBatches, paymentReconciliations, receivableAccounts,
   receivableInstallments, receivablePaymentAllocations,
@@ -36,8 +36,13 @@ export async function buildAdminDataExport(input: ExportFilters & { authority: A
     const activityRows = await tx.select().from(leadActivityEvents).where(and(gte(leadActivityEvents.occurredAt, from), lte(leadActivityEvents.occurredAt, to)));
     const agendaRows = await tx.select().from(calendarEvents).where(and(gte(calendarEvents.date, input.from), lte(calendarEvents.date, input.to)));
     const saleRows = await tx.select().from(closerSaleRecords).where(and(gte(closerSaleRecords.soldAt, from), lte(closerSaleRecords.soldAt, to)));
-    const ledgerRows = await tx.select().from(leadFinancialEvents).where(and(gte(leadFinancialEvents.occurredAt, from), lte(leadFinancialEvents.occurredAt, to), eq(leadFinancialEvents.currency, input.currency)));
     const saleLeadIds = saleRows.map((sale) => sale.leadId);
+    const periodVoidRows = await tx.select().from(closerSaleVoids).where(and(gte(closerSaleVoids.occurredAt, from), lte(closerSaleVoids.occurredAt, to)));
+    const linkedVoidRows = saleLeadIds.length ? await tx.select().from(closerSaleVoids).where(and(inArray(closerSaleVoids.leadId, saleLeadIds), lte(closerSaleVoids.occurredAt, asOf))) : [];
+    const voidRows = [...new Map([...periodVoidRows, ...linkedVoidRows].map((row) => [row.leadId, row])).values()]
+      .filter((row) => row.snapshot.currency === null || row.snapshot.currency === input.currency);
+    const voidedLeadIds = new Set(linkedVoidRows.map((row) => row.leadId));
+    const ledgerRows = await tx.select().from(leadFinancialEvents).where(and(gte(leadFinancialEvents.occurredAt, from), lte(leadFinancialEvents.occurredAt, to), eq(leadFinancialEvents.currency, input.currency)));
     const accountRows = saleLeadIds.length ? await tx.select().from(receivableAccounts).where(and(inArray(receivableAccounts.leadId, saleLeadIds), eq(receivableAccounts.currency, input.currency))) : [];
     const accountLeadIds = accountRows.map((account) => account.leadId);
     const installmentRows = accountLeadIds.length ? await tx.select().from(receivableInstallments).where(inArray(receivableInstallments.leadId, accountLeadIds)) : [];
@@ -64,6 +69,7 @@ export async function buildAdminDataExport(input: ExportFilters & { authority: A
     const activityData = dataset(["id", "leadId", "actorId", "actorRole", "kind", "title", "description", "metadata", "occurredAt"], activityRows.map((row) => ({ id: row.id, leadId: row.leadId, actorId: row.actorId, actorRole: row.actorRole, kind: row.kind, title: row.title, description: row.description, metadata: row.metadata, occurredAt: row.occurredAt })));
     const agendaData = dataset(["id", "title", "date", "startTime", "durationMinutes", "callerId", "closerId", "createdById", "createdAt", "updatedAt"], agendaRows);
     const salesData = dataset(["leadId", "saleAmountCents", "amountPaidCents", "currency", "soldAt", "paymentMethod", "financingProvider", "installmentMonths", "onboardingCompleted", "createdAt", "updatedAt"], saleRows.filter((row) => row.currency === input.currency));
+    const saleVoidsData = dataset(["leadId", "actorId", "reason", "snapshot", "occurredAt"], voidRows.map((row) => ({ leadId: row.leadId, actorId: row.actorId, reason: row.reason, snapshot: row.snapshot, occurredAt: row.occurredAt })));
     const ledgerData = dataset(["id", "leadId", "kind", "amountCents", "currency", "occurredAt", "createdById", "note", "externalReference", "reversalOfId", "createdAt"], ledgerRows.map((row) => ({ id: row.id, leadId: row.leadId, kind: row.kind, amountCents: row.amountCents, currency: row.currency, occurredAt: row.occurredAt, createdById: row.createdById, note: row.note, externalReference: row.externalReference, reversalOfId: row.reversalOfId, createdAt: row.createdAt })));
     const accountsData = dataset(["leadId", "currency", "contractedAmountCents", "activeScheduleVersion", "updatedById", "createdAt", "updatedAt"], accountRows);
     const installmentsData = dataset(["id", "leadId", "scheduleVersion", "sequence", "dueOn", "expectedAmountCents", "supersededAt", "createdAt"], installmentRows);
@@ -74,7 +80,7 @@ export async function buildAdminDataExport(input: ExportFilters & { authority: A
     const profilesData = dataset(["id", "providerKey", "name", "createdById", "createdAt"], profileRows);
 
     const reversed = new Set(reversalRows.flatMap((row) => row.reversalOfId ? [row.reversalOfId] : []));
-    const processedSalesRows = saleRows.filter((sale) => sale.currency === input.currency).map((sale) => {
+    const processedSalesRows = saleRows.filter((sale) => sale.currency === input.currency && !voidedLeadIds.has(sale.leadId)).map((sale) => {
       const account = accountRows.find((row) => row.leadId === sale.leadId);
       const current = account ? installmentRows.filter((row) => row.leadId === sale.leadId && row.scheduleVersion === account.activeScheduleVersion && !row.supersededAt) : [];
       const currentIds = new Set(current.map((row) => row.id));
@@ -88,7 +94,7 @@ export async function buildAdminDataExport(input: ExportFilters & { authority: A
     const metricsData = dataset(["policyVersion", "asOf", "timeZone", "from", "to", "currency", "leadCount", "saleCount", "conversionRateBps", "contractedCents", "collectedCents", "outstandingCents", "overdueCents"], metricsRows);
     const files = {
       "leads.csv": leadData, "feedbacks.csv": feedbackData, "lead_activity.csv": activityData, "agendas.csv": agendaData,
-      "sales.csv": salesData, "financial_ledger.csv": ledgerData, "receivable_accounts.csv": accountsData,
+      "sales.csv": salesData, "closer_sale_voids.csv": saleVoidsData, "financial_ledger.csv": ledgerData, "receivable_accounts.csv": accountsData,
       "receivable_installments.csv": installmentsData, "receivable_allocations.csv": allocationsData,
       "payment_reconciliations.csv": reconciliationData, "payment_reconciliation_allocations.csv": reconciliationAllocationsData,
       "payment_reconciliation_batches.csv": batchesData, "payment_provider_profiles.csv": profilesData,
@@ -98,8 +104,8 @@ export async function buildAdminDataExport(input: ExportFilters & { authority: A
       formatVersion: 1, policyVersion: ADMIN_EXPORT_POLICY_VERSION, asOf: asOf.toISOString(), timeZone: "Europe/Madrid",
       snapshot: { isolationLevel: "repeatable read", marker: "transaction_timestamp" },
       filters: { from: input.from, to: input.to, currency: input.currency, includePii: input.includePii },
-      dateBasis: { leads: "createdAt", feedbacks: "lead.updatedAt", agendas: "date", sales: "soldAt", financialLedger: "occurredAt", reconciliations: "occurredAt" },
-      formulas: { conversionRateBps: "round(saleCount * 10000 / leadCount)", outstandingCents: "contractedCents - collectedCents", overdueCents: "sum(outstanding installments with dueOn before asOf Madrid day)" },
+      dateBasis: { leads: "createdAt", feedbacks: "lead.updatedAt", agendas: "date", sales: "soldAt", saleVoids: "occurredAt or related sale in range", financialLedger: "occurredAt", reconciliations: "occurredAt" },
+      formulas: { activeSales: "processed sales exclude leads with an auditable sale void as of the snapshot", conversionRateBps: "round(saleCount * 10000 / leadCount)", outstandingCents: "contractedCents - collectedCents", overdueCents: "sum(outstanding installments with dueOn before asOf Madrid day)" },
       pii: input.includePii ? "Admin-authorized lead email and phone included" : "Lead email and phone excluded",
       excluded: ["authentication accounts", "password hashes", "sessions", "tokens", "environment secrets", "financial idempotency keys"],
       files: await Promise.all(Object.entries(files).map(async ([name, value]) => ({ name, rows: value.rows.length, sha256: await hashText(value.csv) }))),
