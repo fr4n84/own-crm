@@ -42,12 +42,9 @@ export function TeamPresenceTrigger({ onlineCount }: { onlineCount: number }) {
   return <Button variant="ghost" size="sm" aria-label="Ver presencia del equipo"><UsersIcon data-icon="inline-start" /><span className="hidden sm:inline">{onlineCount} online</span><span className="sm:hidden">{onlineCount}</span></Button>;
 }
 
-export function TeamPresenceContent({ state, members }: { state: "loading" | "error" | "ready"; members: TeamPresenceDto[] }) {
-  if (state === "loading") return <div className="flex flex-col gap-2" role="status" aria-label="Cargando presencia del equipo"><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /></div>;
-  if (state === "error") return <p role="status" className="text-muted-foreground">Presencia no disponible. Puedes seguir trabajando con normalidad.</p>;
-  if (members.length === 0) return <Empty className="py-4" heading="No hay miembros activos" description="No hay estados disponibles para mostrar." />;
+function PresenceMemberList({ members }: { members: readonly TeamPresenceDto[] }) {
   return (
-    <ul className="flex max-h-80 flex-col gap-2 overflow-y-auto" aria-label="Estado aproximado del equipo">
+    <ul className="flex flex-col gap-2">
       {members.map((member) => (
         <li key={member.userId} className="flex items-center gap-2 p-2">
           <Avatar size="sm"><AvatarFallback>{initials(member.displayName)}</AvatarFallback></Avatar>
@@ -60,5 +57,31 @@ export function TeamPresenceContent({ state, members }: { state: "loading" | "er
         </li>
       ))}
     </ul>
+  );
+}
+
+export function TeamPresenceContent({ state, members }: { state: "loading" | "error" | "ready"; members: TeamPresenceDto[] }) {
+  if (state === "loading") return <div className="flex flex-col gap-2" role="status" aria-label="Cargando presencia del equipo"><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /></div>;
+  if (state === "error") return <p role="status" className="text-muted-foreground">Presencia no disponible. Puedes seguir trabajando con normalidad.</p>;
+  if (members.length === 0) return <Empty className="py-4" heading="No hay miembros activos" description="No hay estados disponibles para mostrar." />;
+
+  const activeMembers = members.filter((member) => member.status === "online");
+  const recentMembers = members.filter((member) => member.status !== "online");
+
+  return (
+    <div className="flex max-h-80 flex-col gap-4 overflow-y-auto" role="region" aria-label="Estado aproximado del equipo">
+      <section aria-label="Activos">
+        <h3 className="px-2 pb-1 text-sm font-semibold">Activos</h3>
+        {activeMembers.length > 0
+          ? <PresenceMemberList members={activeMembers} />
+          : <p className="px-2 text-sm text-muted-foreground">Nadie está activo ahora.</p>}
+      </section>
+      <section aria-label="Actividad reciente">
+        <h3 className="px-2 pb-1 text-sm font-semibold">Actividad reciente</h3>
+        {recentMembers.length > 0
+          ? <PresenceMemberList members={recentMembers} />
+          : <p className="px-2 text-sm text-muted-foreground">No hay actividad reciente.</p>}
+      </section>
+    </div>
   );
 }

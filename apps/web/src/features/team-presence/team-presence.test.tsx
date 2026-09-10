@@ -15,6 +15,7 @@ import {
 const members = [
   { userId: "u1", displayName: "Ana López", roleName: "Caller", status: "online", category: "sales", lastActiveBucket: "now" },
   { userId: "u2", displayName: "Luis Pérez", status: "away", category: "coaching", lastActiveBucket: "recently" },
+  { userId: "u3", displayName: "Marta Ruiz", status: "offline", category: null, lastActiveBucket: "earlier" },
 ] as const;
 
 describe("team presence UI", () => {
@@ -30,11 +31,23 @@ describe("team presence UI", () => {
     expect(renderToStaticMarkup(<TeamPresenceContent state="ready" members={[]} />)).toContain("No hay miembros activos");
   });
 
-  it("shows only coarse status, category and approximate activity", () => {
+  it("separates active and recent members while keeping only coarse activity", () => {
     const html = renderToStaticMarkup(<TeamPresenceContent state="ready" members={[...members]} />);
-    expect(html).toContain("Ana López");
+    const activeHeading = html.indexOf(">Activos<");
+    const onlineMember = html.indexOf("Ana López");
+    const recentHeading = html.indexOf(">Actividad reciente<");
+    const awayMember = html.indexOf("Luis Pérez");
+    const offlineMember = html.indexOf("Marta Ruiz");
+
+    expect(activeHeading).toBeGreaterThanOrEqual(0);
+    expect(onlineMember).toBeGreaterThan(activeHeading);
+    expect(recentHeading).toBeGreaterThan(onlineMember);
+    expect(awayMember).toBeGreaterThan(recentHeading);
+    expect(offlineMember).toBeGreaterThan(awayMember);
     expect(html).toContain("Ventas");
     expect(html).toContain("Ahora");
+    expect(html).toContain("Recientemente");
+    expect(html).toContain("Hace un tiempo");
     expect(html).not.toContain("/leads");
     expect(html).not.toContain("leadId");
   });

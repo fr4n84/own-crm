@@ -1,6 +1,10 @@
 import type { TeamPresenceCategory } from "@crm-fran/db/schema/team-presence";
 
-import { buildTeamPresenceDto, HEARTBEAT_MIN_WRITE_INTERVAL_MS } from "./domain";
+import {
+  buildTeamPresenceDto,
+  HEARTBEAT_MIN_WRITE_INTERVAL_MS,
+  selectVisibleTeamPresenceRows,
+} from "./domain";
 import type { TeamPresenceRepository } from "./repository";
 
 export function createTeamPresenceService(repository: TeamPresenceRepository, clock: () => Date = () => new Date()) {
@@ -17,7 +21,9 @@ export function createTeamPresenceService(repository: TeamPresenceRepository, cl
     async list(options: { includeRoles: boolean }) {
       const now = clock();
       const rows = await repository.listActiveUsers();
-      return rows.map((row) => buildTeamPresenceDto(row, { now, includeRole: options.includeRoles }));
+      return selectVisibleTeamPresenceRows(rows, now).map((row) =>
+        buildTeamPresenceDto(row, { now, includeRole: options.includeRoles }),
+      );
     },
   };
 }
