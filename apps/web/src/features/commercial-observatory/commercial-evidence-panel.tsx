@@ -87,7 +87,7 @@ export function CommercialEvidencePanel() {
           </Information>
         </div>
         <p className="text-sm text-muted-foreground">
-          Probabilidad observacional, margen real esperado y casos comparables; nunca una decisión automática.
+          Evidencia por lead: probabilidad observacional, margen real esperado y casos comparables; nunca una decisión automática. Esta lectura no atribuye la causalidad del cambio entre periodos.
         </p>
       </div>
 
@@ -99,7 +99,7 @@ export function CommercialEvidencePanel() {
         <CardContent className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,0.7fr)]">
           <Input aria-label="Buscar lead" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar lead" />
           <Select value={leadId} onValueChange={(value) => setLeadId(value ?? "")}>
-            <SelectTrigger className="w-full"><SelectValue placeholder="Selecciona un lead" /></SelectTrigger>
+            <SelectTrigger className="w-full" aria-label="Seleccionar lead para evidencia comercial"><SelectValue placeholder="Selecciona un lead" /></SelectTrigger>
             <SelectContent><SelectGroup>{(leads.data ?? []).map((lead) => <SelectItem key={lead.id} value={lead.id}>{lead.name}</SelectItem>)}</SelectGroup></SelectContent>
           </Select>
           <div className="lg:col-span-2">
@@ -115,7 +115,7 @@ export function CommercialEvidencePanel() {
       </Card>
 
       <Tabs defaultValue="score">
-        <TabsList className="h-auto w-fit max-w-full flex-nowrap justify-start gap-1 rounded-lg border bg-muted/40 p-1">
+        <TabsList className="h-auto w-fit max-w-full flex-nowrap justify-start gap-1 rounded-lg border bg-muted/40 p-1" aria-label="Tipos de evidencia comercial">
           <TabsTrigger className="h-11! min-h-11! flex-none rounded-md px-3 py-2 text-sm data-active:bg-background" value="score">Score económico</TabsTrigger>
           <TabsTrigger className="h-11! min-h-11! flex-none rounded-md px-3 py-2 text-sm data-active:bg-background" value="twins">Casos gemelos</TabsTrigger>
           {admin ? <TabsTrigger className="h-11! min-h-11! flex-none rounded-md px-3 py-2 text-sm data-active:bg-background" value="micro">Microsegmentos</TabsTrigger> : null}
@@ -135,10 +135,15 @@ export function CommercialEvidencePanel() {
                     <div className="flex items-center justify-between gap-2"><CardTitle>Margen esperado real</CardTitle><Badge variant="outline">{currency}</Badge></div>
                     <CardDescription>Estimación observacional · {evidence.data.score.policyVersion}</CardDescription>
                   </CardHeader>
-                  <CardContent className="flex flex-col gap-2">
-                    <p className="text-2xl font-semibold">{evidence.data.score.expectedMarginCents === null ? "Verdad económica insuficiente" : money(evidence.data.score.expectedMarginCents, currency)}</p>
-                    <p className="text-xs text-muted-foreground">Probabilidad {(evidence.data.score.probabilityBps / 100).toFixed(1)}% · n={evidence.data.score.denominator} · respaldo {commercialUiLabel(evidence.data.score.fallback)} · confianza {commercialUiLabel(evidence.data.score.confidence)}</p>
-                    <p className="text-xs text-muted-foreground">Índice 0–100: {evidence.data.score.score0To100 ?? "muestra monetaria insuficiente"} · escala P10/P90 de la cohorte en {currency}</p>
+                  <CardContent>
+                    <dl className="grid gap-3 sm:grid-cols-2" aria-label={`Métricas de evidencia económica en ${currency}`}>
+                      <div className="sm:col-span-2"><dt className="text-xs text-muted-foreground">Margen esperado real</dt><dd className="text-2xl font-semibold">{evidence.data.score.expectedMarginCents === null ? "Verdad económica insuficiente" : money(evidence.data.score.expectedMarginCents, currency)}</dd></div>
+                      <div><dt className="text-xs text-muted-foreground">Probabilidad observacional</dt><dd>{(evidence.data.score.probabilityBps / 100).toFixed(1)}%</dd></div>
+                      <div><dt className="text-xs text-muted-foreground">Muestra</dt><dd>n={evidence.data.score.denominator}</dd></div>
+                      <div><dt className="text-xs text-muted-foreground">Nivel de respaldo</dt><dd>{commercialUiLabel(evidence.data.score.fallback)}</dd></div>
+                      <div><dt className="text-xs text-muted-foreground">Confianza</dt><dd>{commercialUiLabel(evidence.data.score.confidence)}</dd></div>
+                      <div className="sm:col-span-2"><dt className="text-xs text-muted-foreground">Índice 0–100</dt><dd>{evidence.data.score.score0To100 ?? "Muestra monetaria insuficiente"} · escala P10/P90 de la cohorte en {currency}</dd></div>
+                    </dl>
                   </CardContent>
                 </Card>
               );
@@ -190,7 +195,7 @@ export function CommercialEvidencePanel() {
             : <Card size="sm">
               <CardHeader className="gap-0.5"><div className="flex items-center gap-1"><CardTitle>Centro de confianza</CardTitle><Information title="Calibración">Contrasta predicciones previamente mostradas con resultados posteriores maduros. Brier y ECE describen error de calibración; no cambian modelos ni decisiones, porque los cambios permanecen en modo sombra.</Information></div><CardDescription>Calibración semanal de instantáneas maduras controladas por el servidor; cambios solo en modo sombra.</CardDescription></CardHeader>
               <CardContent className="flex flex-col gap-3">
-                <div className="grid gap-2 sm:grid-cols-3"><div><p className="text-lg font-semibold">{confidence.data.coverage.calibrated}/{confidence.data.coverage.maturedShown}</p><p className="text-xs text-muted-foreground">Calibrados / maduros</p></div><div><p className="text-lg font-semibold">{confidence.data.brier?.toFixed(3) ?? "—"}</p><p className="text-xs text-muted-foreground">Brier</p></div><div><p className="text-lg font-semibold">{confidence.data.ece?.toFixed(3) ?? "—"}</p><p className="text-xs text-muted-foreground">ECE</p></div></div>
+                <dl className="grid gap-2 sm:grid-cols-3" aria-label="Métricas de calibración"><div><dt className="text-xs text-muted-foreground">Calibrados / maduros</dt><dd className="text-lg font-semibold">{confidence.data.coverage.calibrated}/{confidence.data.coverage.maturedShown}</dd></div><div><dt className="text-xs text-muted-foreground">Brier</dt><dd className="text-lg font-semibold">{confidence.data.brier?.toFixed(3) ?? "—"}</dd></div><div><dt className="text-xs text-muted-foreground">ECE</dt><dd className="text-lg font-semibold">{confidence.data.ece?.toFixed(3) ?? "—"}</dd></div></dl>
                 <p className="text-xs text-muted-foreground">{confidence.data.legacyExcluded} históricos excluidos · {confidence.data.missingEconomic} sin verdad económica · cobertura {confidence.data.coverage.rateBps === null ? "—" : `${confidence.data.coverage.rateBps / 100}%`}</p>
                 <div className="grid gap-3 lg:grid-cols-3">
                   {([["Historial semanal", confidence.data.weekly], ["Por política", confidence.data.byPolicy], ["Por nivel de respaldo", confidence.data.byFallback]] as const).map(([title, rows]) => <Card key={title} size="sm"><CardHeader><CardTitle>{title}</CardTitle></CardHeader><CardContent className="max-h-40 overflow-auto">{rows.length === 0 ? <p className="text-xs text-muted-foreground">Sin grupos maduros.</p> : rows.map((row) => <p key={row.key} className="py-1 text-xs">{commercialUiLabel(row.key)} · n={row.sample} · {title === "Historial semanal" ? `Brier ${row.brier?.toFixed(3) ?? "—"}` : `ECE ${row.ece?.toFixed(3) ?? "—"}`}</p>)}</CardContent></Card>)}

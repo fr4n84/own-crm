@@ -61,7 +61,7 @@ describe("commercial observatory Arc visual contract", () => {
     expect(observatory).toContain('aria-label="Resumen de evidencia estacional"');
     expect(observatory).toContain('aria-label="Señales estacionales por día"');
     expect(observatory).toContain('<MetricExplanation explanation={explanations["seasonality.weekly_volume"]} />');
-    expect(metricExplanation).toContain('aria-label={label ?? `Explicar ${explanation.title}`}');
+expect(metricExplanation).toContain('<ExplanationTrigger label={label ?? `Explicar ${explanation.title}`} />');
     expect(observatory).toContain("sm:grid-cols-2");
     expect(observatory).toContain("rounded-md border bg-background p-3");
     expect(observatory).not.toContain("md:hidden");
@@ -71,5 +71,28 @@ describe("commercial observatory Arc visual contract", () => {
     expect(observatory).toContain('Card size="sm" className="w-fit max-w-full"');
     expect(observatory).toContain("sm:flex-row sm:items-end");
     expect(observatory).toContain("p-3");
+  });
+  it("explains the period-over-period bridge without implying nonexistent bars or causality", () => {
+    expect(observatory).toContain("Qué cambió frente al periodo anterior");
+    expect(observatory).toContain("Δ ventas = volumen + conversión");
+    expect(observatory).toContain("Periodo actual");
+    expect(observatory).toContain("Periodo anterior");
+    expect(observatory).toContain("Muestra madura actual / anterior");
+    expect(observatory).toContain("Moneda");
+    expect(observatory).toContain("descriptivo");
+    expect(observatory).toContain("No demuestra causalidad");
+    expect(observatory).not.toMatch(/\bbarras?\b/iu);
+    expect(observatory.match(/<MetricExplanationGroup/g)?.length ?? 0).toBeGreaterThanOrEqual(5);
+  });
+
+  it("gives commercial evidence named controls and semantic per-lead metrics", () => {
+    expect(evidence).toContain('aria-label="Seleccionar lead para evidencia comercial"');
+    expect(evidence).toContain('aria-label="Tipos de evidencia comercial"');
+    expect(evidence).toContain('aria-label={`Métricas de evidencia económica en ${currency}`}');
+    expect(evidence).toContain("<dl");
+    expect(evidence).toContain("<dt");
+    expect(evidence).toContain("<dd");
+    expect(evidence).toContain("Evidencia por lead");
+    expect(evidence).toContain("no atribuye la causalidad del cambio entre periodos");
   });
 });
