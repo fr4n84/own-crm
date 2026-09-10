@@ -17,6 +17,7 @@ export const NAVIGATION_MODULE_IDS = [
   "messages",
   "personal-statistics",
   "users-access",
+  "email-marketing",
 ] as const;
 
 export type NavigationModuleId = (typeof NAVIGATION_MODULE_IDS)[number];
@@ -38,6 +39,7 @@ export const NAVIGATION_MODULE_CATALOG = [
   { id: "messages" },
   { id: "personal-statistics", requiredPermission: "leads:read" },
   { id: "users-access", globalOnly: true },
+  { id: "email-marketing", globalOnly: true },
 ] as const;
 
 export type NavigationVisibilityEntry = {

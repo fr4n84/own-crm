@@ -12,6 +12,7 @@ import { ActiveTitle } from "@/components/active-title";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ModeToggle } from "@/components/mode-toggle";
 import { AlertButton } from "@/features/alerts/alert-button";
+import { TeamPresence } from "@/features/team-presence/team-presence";
 
 export function isPublicAuthPath(pathname: string) {
   return pathname === "/recuperar-contrasena" || pathname === "/login" || pathname.startsWith("/login/")
@@ -39,7 +40,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     >
       <AppSidebar variant="inset" />
       <SidebarInset>
-        <SiteHeader toggle={<ModeToggle />} alertButton={<AlertButton />}>
+        <SiteHeader toggle={<ModeToggle />} alertButton={<><TeamPresence /><AlertButton /></>}>
           <ActiveTitle />
         </SiteHeader>
         <div className="flex flex-1 flex-col">{children}</div>

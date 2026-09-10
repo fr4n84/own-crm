@@ -44,6 +44,7 @@ export const PERMISSION_VALUES = [
   "alerts:read", "alerts:write", "alerts:delete", "alerts:*",
   "settings:read", "settings:write",
   "sales:read", "sales:write", "sales:*",
+  "coaching:read", "coaching:review", "coaching:*",
   "*",
 ] as const;
 

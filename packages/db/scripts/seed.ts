@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 import { createDb } from "@crm-fran/db";
 import { user } from "@crm-fran/db/schema/auth";
 import { leads } from "@crm-fran/db/schema/leads";
+import { leadDuplicateCases } from "@crm-fran/db/schema/lead-duplicates";
 
 import { buildLeadCsvImport } from "../src/import/lead-csv-import";
 
@@ -55,6 +56,19 @@ async function seed() {
 
     for (const batch of batches(plan.leads, 250)) {
       await transaction.insert(leads).values(batch);
+    }
+    for (const batch of batches(plan.duplicateWarnings, 250)) {
+      await transaction.insert(leadDuplicateCases).values(batch.map((warning) => {
+        const [leadAId, leadBId] = [warning.leadId, warning.candidateLeadId].sort();
+        if (!leadAId || !leadBId) throw new Error("Caso de duplicado inválido");
+        return {
+          id: crypto.randomUUID(),
+          leadAId,
+          leadBId,
+          reasons: warning.reasons,
+          nameSimilarity: warning.nameSimilarity,
+        };
+      })).onConflictDoNothing();
     }
   });
 

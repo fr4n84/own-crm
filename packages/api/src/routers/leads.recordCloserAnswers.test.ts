@@ -22,6 +22,7 @@ describe("closer feedback alert lifecycle", () => {
       .insert(roles)
       .values([
         { id: "role-closer", name: "Closer", permissions: ["leads:*", "alerts:*"] },
+        { id: "role-caller", name: "Caller", permissions: ["leads:*", "alerts:*"] },
         { id: "role-admin", name: "Admin", permissions: ["*"] },
       ])
       .onConflictDoNothing();
@@ -44,13 +45,19 @@ describe("closer feedback alert lifecycle", () => {
     await db.insert(user).values({
       id,
       roleId,
-      name: roleId === "role-admin" ? "Admin" : "Closer",
+      name:
+        roleId === "role-admin"
+          ? "Admin"
+          : roleId === "role-caller"
+            ? "Caller"
+            : "Closer",
       email: `${id}@test.com`,
     });
     return id;
   }
 
-  async function createLead(closerId: string) {
+  async function createScheduledLead(closerId: string) {
+    const callerId = await createUser("role-caller");
     const id = crypto.randomUUID();
     leadIds.push(id);
     await db.insert(leads).values({
@@ -58,7 +65,17 @@ describe("closer feedback alert lifecycle", () => {
       name: "Lead",
       email: `${id}@lead.test`,
       phone: "600000000",
+      callerId,
       closerId,
+      questions: [
+        {
+          questionKey: "callerOutcome",
+          question: "¿Qué sucedió?",
+          answer: "Agenda",
+          authorRole: "caller",
+          authorId: callerId,
+        },
+      ],
     });
     return id;
   }
@@ -106,7 +123,7 @@ describe("closer feedback alert lifecycle", () => {
 
   it("upserts Seguimiento and No-show for the assigned closer, then resolves obsolete work", async () => {
     const closerId = await createUser();
-    const leadId = await createLead(closerId);
+    const leadId = await createScheduledLead(closerId);
     const originalAlertId = await createAppointmentAlert(leadId, closerId);
 
     await recordCloserAnswers({
@@ -180,7 +197,7 @@ describe("closer feedback alert lifecycle", () => {
   it("creates a dated Reagenda alert for the assigned closer, including admin-authored feedback", async () => {
     const closerId = await createUser();
     const adminId = await createUser("role-admin");
-    const leadId = await createLead(closerId);
+    const leadId = await createScheduledLead(closerId);
 
     await recordCloserAnswers({
       ctx: context(adminId, "role-admin", true),
@@ -203,7 +220,7 @@ describe("closer feedback alert lifecycle", () => {
 
   it("rejects undated scheduled outcomes and never triggers from free text", async () => {
     const closerId = await createUser();
-    const leadId = await createLead(closerId);
+    const leadId = await createScheduledLead(closerId);
 
     await expect(
       recordCloserAnswers({
@@ -241,8 +258,8 @@ describe("closer feedback alert lifecycle", () => {
     const firstCloserId = await createUser();
     const secondCloserId = await createUser();
     const adminId = await createUser("role-admin");
-    const firstLeadId = await createLead(firstCloserId);
-    const secondLeadId = await createLead(secondCloserId);
+    const firstLeadId = await createScheduledLead(firstCloserId);
+    const secondLeadId = await createScheduledLead(secondCloserId);
 
     for (const [closerId, leadId] of [
       [firstCloserId, firstLeadId],

@@ -30,6 +30,7 @@ export function CallRecordingPanel({
   const [state, setState] = useState<RecordingState>("idle");
   const [leadWasInformed, setLeadWasInformed] = useState(false);
   const [error, setError] = useState<string>();
+  const [coachingCreated, setCoachingCreated] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -79,12 +80,14 @@ export function CallRecordingPanel({
     });
     const body = (await response.json()) as {
       draft?: CallFeedbackDraft | CloserCallFeedbackDraft;
+      coaching?: { id: string } | null;
       error?: string;
     };
     if (!response.ok || !body.draft) {
       throw new Error(body.error ?? "No se pudo procesar la grabación");
     }
     onDraft(body.draft);
+    setCoachingCreated(Boolean(body.coaching?.id));
   };
 
   const startRecording = async () => {
@@ -177,6 +180,7 @@ export function CallRecordingPanel({
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {coachingCreated && <p className="mb-3 text-sm text-muted-foreground" role="status">Tu borrador privado de coaching está listo para revisarlo en Estadísticas personales.</p>}
           <Button type="button" variant="outline" onClick={() => setState("ready")}>
             <MicIcon data-icon="inline-start" />
             Grabar con IA
@@ -197,8 +201,7 @@ export function CallRecordingPanel({
               : "Preparar grabación"}
         </CardTitle>
         <CardDescription>
-          El audio y la transcripción no se guardan. La IA crea únicamente un borrador
-          estructurado para que lo revises antes de guardar.
+          El audio y la transcripción no se guardan. La IA crea borradores estructurados de feedback y coaching para revisión humana.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">

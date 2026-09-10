@@ -9,6 +9,7 @@ const experiments = readFileSync(resolve(__dirname, "commercial-experiments-pane
 const evidence = readFileSync(resolve(__dirname, "commercial-evidence-panel.tsx"), "utf8");
 const planning = readFileSync(resolve(__dirname, "commercial-planning-panel.tsx"), "utf8");
 const intelligence = readFileSync(resolve(__dirname, "commercial-intelligence-panel.tsx"), "utf8");
+const metricExplanation = readFileSync(resolve(__dirname, "metric-explanation.tsx"), "utf8");
 const feedback = readFileSync(resolve(__dirname, "../feedback-statistics/feedback-statistics-view.tsx"), "utf8");
 const combined = `${observatory}\n${layout}\n${navigation}\n${experiments}\n${evidence}\n${planning}\n${intelligence}\n${feedback}`;
 
@@ -59,7 +60,8 @@ describe("commercial observatory Arc visual contract", () => {
   it("keeps seasonality legible across mobile and desktop without exposing long rules inline", () => {
     expect(observatory).toContain('aria-label="Resumen de evidencia estacional"');
     expect(observatory).toContain('aria-label="Señales estacionales por día"');
-    expect(observatory).toContain('label="Información sobre metodología estacional"');
+    expect(observatory).toContain('<MetricExplanation explanation={explanations["seasonality.weekly_volume"]} />');
+    expect(metricExplanation).toContain('aria-label={label ?? `Explicar ${explanation.title}`}');
     expect(observatory).toContain("sm:grid-cols-2");
     expect(observatory).toContain("rounded-md border bg-background p-3");
     expect(observatory).not.toContain("md:hidden");

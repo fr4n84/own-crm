@@ -185,6 +185,18 @@ describe("call feedback", () => {
     expect(persisted).not.toHaveProperty("transcript");
   });
 
+  it("turns the transient transcript into a reviewable coaching draft without retaining source text", async () => {
+    const coachingDraft = { rubricVersion: "caller-v1", criteria: [{ key: "discovery", rating: "unknown" as const, evidenceSignals: ["evidence_insufficient" as const], recommendation: "Valida la necesidad." }], summary: "Revisión humana necesaria.", requiresPersonalReview: true, reviewReasons: ["uncertain_evidence" as const] };
+    const recordCoachingDraft = vi.fn().mockResolvedValue({ id: "coaching-1" });
+    const result = await processCallRecording({
+      audio: new File(["audio"], "call.webm", { type: "audio/webm" }), durationMs: 60_000, leadId: "lead-1", userId: "caller-1", permissions: ["leads:write"],
+      dependencies: dependencies({ analyzeCoaching: vi.fn().mockResolvedValue({ draft: coachingDraft, inputTokens: 500, outputTokens: 100 }), recordCoachingDraft }),
+    });
+    expect(result.coaching).toEqual({ id: "coaching-1", draft: coachingDraft });
+    expect(recordCoachingDraft).toHaveBeenCalledWith(expect.objectContaining({ actorId: "caller-1", analyzedUserId: "caller-1", leadId: "lead-1", role: "caller", draft: coachingDraft }));
+    expect(JSON.stringify(recordCoachingDraft.mock.calls)).not.toContain("transient transcript");
+  });
+
   it("rejects a caller who does not own the lead before invoking providers", async () => {
     const transcribe = vi.fn();
     const deps = dependencies({ transcribe });

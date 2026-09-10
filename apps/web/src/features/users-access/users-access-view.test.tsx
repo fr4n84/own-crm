@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { PRIMARY_NAVIGATION_ITEMS } from "@crm-fran/ui/lib/navigation-policy";
 const mocks = vi.hoisted(() => ({ mutate: vi.fn(), visibilityMutate: vi.fn(), accessMutate: vi.fn(), success: vi.fn(), error: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { success: mocks.success, error: mocks.error } }));
 vi.mock("@/utils/trpc", () => ({ trpc: { users: {
@@ -71,7 +72,10 @@ describe("navigation and account access saves", () => {
     fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
     await waitFor(() => expect(mocks.visibilityMutate).toHaveBeenCalledOnce());
     const input = mocks.visibilityMutate.mock.calls[0]?.[0];
-    expect(input.entries).toHaveLength(16);
+    expect(input.entries.map((entry: { moduleId: string }) => entry.moduleId)).toEqual(
+      PRIMARY_NAVIGATION_ITEMS.map((module) => module.id),
+    );
+    expect(input.entries.find((entry: { moduleId: string }) => entry.moduleId === "email-marketing").roleIds).toEqual(["role-admin"]);
     expect(input.entries.find((entry: { moduleId: string }) => entry.moduleId === "closer-sales").roleIds).toContain("role-closer");
   });
 

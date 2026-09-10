@@ -1,6 +1,7 @@
 import type { LeadFinancialEventKind } from "@crm-fran/db/schema/index";
 
 import { buildFinancialTruthProjection, type FinancialTruthEvent } from "../profitability/financial-truth";
+import { buildObservatoryMetricExplanations, OBSERVATORY_METRIC_EXPLANATION_VERSION } from "./metric-explanations";
 
 export const COMMERCIAL_OBSERVATORY_POLICY_VERSION = "commercial-observatory-v1";
 export const COMMERCIAL_OBSERVATORY_TIME_ZONE = "Europe/Madrid";
@@ -407,22 +408,44 @@ export function buildCommercialObservatory(input: BuildInput) {
     return cutoff ? row.financialEvents.filter((event) => event.occurredAt < cutoff).map((event) => event.currency) : [];
   }))].sort();
   const resolvedCurrency = input.currency ?? (currencies.length === 1 ? currencies[0] : undefined);
+  const seasonalityData = seasonality(rows, input.from, input.to);
+  const anomaliesData = anomalyRadar(rows, input.from, input.to);
+  const commercialBridgeData = commercialBridge(rows, input.from, input.to);
+  const economicBridgeData = economicBridge(rows, input.from, input.to, currencies, resolvedCurrency);
+  const riskData = riskMap(rows, input.from, input.to, input.asOf, resolvedCurrency);
+  const metricExplanations = buildObservatoryMetricExplanations({
+    from: input.from,
+    to: input.to,
+    asOf: input.asOf,
+    observations: rows.length,
+    duplicateObservationsExcluded: duplicates,
+    withoutAttribution: riskData.coverage.withoutAttribution,
+    salesWithoutLedger: riskData.coverage.salesWithoutLedger,
+    currency: resolvedCurrency ?? null,
+    seasonalityAvailable: seasonalityData.status === "available",
+    anomaliesAvailable: anomaliesData.status === "available",
+    commercialBridgeAvailable: commercialBridgeData.status === "available",
+    economicBridgeAvailable: economicBridgeData.status === "available",
+    riskAvailable: riskData.status === "available",
+  });
   return {
     policyVersion: COMMERCIAL_OBSERVATORY_POLICY_VERSION,
+    metricExplanationPolicyVersion: OBSERVATORY_METRIC_EXPLANATION_VERSION,
+    metricExplanations,
     generatedAt: input.asOf,
     timeZone: COMMERCIAL_OBSERVATORY_TIME_ZONE,
     range: { from: input.from, to: input.to },
     coverage: { observations: rows.length, duplicateObservationsExcluded: duplicates },
     currencies,
     resolvedCurrency: resolvedCurrency ?? null,
-    seasonality: seasonality(rows, input.from, input.to),
-    anomalies: anomalyRadar(rows, input.from, input.to),
+    seasonality: seasonalityData,
+    anomalies: anomaliesData,
     bridge: {
       status: rows.length ? "available" as const : "insufficient_evidence" as const,
-      commercial: commercialBridge(rows, input.from, input.to),
-      economic: economicBridge(rows, input.from, input.to, currencies, resolvedCurrency),
+      commercial: commercialBridgeData,
+      economic: economicBridgeData,
       note: "Las barras son una contribución aritmética que suma exactamente el delta. No implica causalidad.",
     },
-    risk: riskMap(rows, input.from, input.to, input.asOf, resolvedCurrency),
+    risk: riskData,
   };
 }

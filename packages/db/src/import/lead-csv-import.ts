@@ -8,6 +8,7 @@ import {
   type LeadQASession,
 } from "../schema/leads";
 import { LEAD_STATE, type LeadState } from "../schema/state";
+import { findDuplicateSignals, normalizeLeadEmail, normalizeLeadPhone } from "../lead-identity";
 
 type LeadInsert = typeof leads.$inferInsert;
 
@@ -167,10 +168,12 @@ export function buildLeadCsvImport({
   csv,
   users,
   createId,
+  phoneCountry = "ES",
 }: {
   csv: string;
   users: readonly ImportUser[];
   createId: () => string;
+  phoneCountry?: "ES";
 }) {
   const records = parse(csv, {
     bom: true,
@@ -206,11 +209,12 @@ export function buildLeadCsvImport({
     }
 
     const rawEmail = value(record, "Correo");
-    const email = rawEmail || null;
+    const emailIdentity = normalizeLeadEmail(rawEmail);
+    const email = emailIdentity.original;
     if (!email) {
       missingEmailRows += 1;
     } else {
-      const normalizedEmail = email.toLowerCase();
+      const normalizedEmail = emailIdentity.normalized!;
       if (seenEmails.has(normalizedEmail)) duplicateEmailRows += 1;
       seenEmails.add(normalizedEmail);
     }
@@ -221,11 +225,14 @@ export function buildLeadCsvImport({
     const createdAt = parseSpanishLeadDate(value(record, "Fecha"));
     const resolvedCallerId = callerId ?? null;
 
+    const phoneIdentity = normalizeLeadPhone(value(record, "Tel"), phoneCountry);
     imported.push({
       id: createId(),
       name: value(record, "Nombre") || "Sin nombre",
       email,
-      phone: value(record, "Tel"),
+      normalizedEmail: emailIdentity.normalized,
+      phone: phoneIdentity.original,
+      normalizedPhone: phoneIdentity.normalized,
       state: canonicalState(sourceState),
       callerId: resolvedCallerId,
       closerId: null,
@@ -248,6 +255,15 @@ export function buildLeadCsvImport({
 
   return {
     leads: imported,
+    duplicateWarnings: imported.flatMap((lead, index) =>
+      imported.slice(0, index).flatMap((candidate) => {
+        const signals = findDuplicateSignals(
+          { name: lead.name, normalizedEmail: lead.normalizedEmail ?? null, normalizedPhone: lead.normalizedPhone ?? null },
+          { name: candidate.name, normalizedEmail: candidate.normalizedEmail ?? null, normalizedPhone: candidate.normalizedPhone ?? null },
+        );
+        return signals.reasons.length === 0 ? [] : [{ leadId: lead.id, candidateLeadId: candidate.id, ...signals }];
+      }),
+    ),
     summary: {
       sourceRows: records.length,
       activeRows: imported.length,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import type { Context } from "../context";
 
-import { closerSaleUpdateInput } from "./closer-sales";
+import { closerSaleUpdateInput, closerSalesRouter } from "./closer-sales";
 
 const validInput = {
   leadId: "lead-1",
@@ -60,5 +61,23 @@ describe("closer sales input", () => {
       financingProvider: "Sequra",
       installmentMonths: 12,
     })).toThrow();
+  });
+
+  it("keeps reconciliation profile, preview, confirmation and cash reporting Admin-only", async () => {
+    expect(closerSalesRouter._def.procedures).toMatchObject({
+      reconciliationProfiles: expect.anything(),
+      createReconciliationProfile: expect.anything(),
+      previewReconciliation: expect.anything(),
+      confirmReconciliation: expect.anything(),
+      cashRealizedReport: expect.anything(),
+    });
+    const caller = closerSalesRouter.createCaller({
+      session: { user: { id: "caller", roleId: "caller", name: "Caller", email: "caller@example.com", emailVerified: true, createdAt: new Date(), updatedAt: new Date() } },
+      role: { id: "caller", name: "Caller", permissions: ["sales:read"] },
+      permissions: ["sales:read"],
+    } as Context);
+    await expect(caller.reconciliationProfiles()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller.previewReconciliation({ profileId: "provider", csv: "x" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller.cashRealizedReport()).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 });

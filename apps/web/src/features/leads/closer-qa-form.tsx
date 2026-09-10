@@ -26,6 +26,7 @@ import {
   FieldError,
 } from "@crm-fran/ui/components/field";
 import { CallRecordingPanel } from "./call-recording-panel";
+import { CloserMeetPanel } from "./closer-meet-panel";
 
 const formSchema = z.object({
   isContacted: z.string(),
@@ -224,6 +225,7 @@ export default function CloserQAForm({
     >
       <FieldGroup>
         <CallRecordingPanel leadId={leadId} feedbackRole="closer" onDraft={(draft) => applyAiDraft(draft as CloserCallFeedbackDraft)} />
+        <CloserMeetPanel leadId={leadId} />
         <form.Field name="closerOutcome">
           {(field) => (
             <Field invalid={field.state.meta.errors.length > 0}>

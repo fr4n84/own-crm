@@ -21,6 +21,7 @@ export const leadWithUsersSelect = {
   closerId: leads.closerId,
   createdAt: leads.createdAt,
   updatedAt: leads.updatedAt,
+  mergedIntoLeadId: leads.mergedIntoLeadId,
   caller: { id: caller.id, name: caller.name, email: caller.email },
   closer: { id: closer.id, name: closer.name, email: closer.email },
 };

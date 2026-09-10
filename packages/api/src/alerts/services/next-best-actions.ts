@@ -7,6 +7,7 @@ import {
   type LeadRiskPriority,
 } from "./lead-risk-queue";
 import { listSkippedRecommendationKeys } from "./next-best-action-events";
+import { listReceivableSummaries } from "../../receivables/service";
 
 type ActionLead = {
   id: string;
@@ -36,6 +37,33 @@ type ActionRiskItem<TLead extends ActionLead> = {
   minutesSinceLastAttempt: number | null;
   assignedAt: Date;
   lastAttemptAt: Date | null;
+};
+
+export type NextBestActionSignalKind =
+  | "whatsapp_pending"
+  | "appointment_upcoming"
+  | "hot_lead"
+  | "payment_due"
+  | "payment_overdue";
+
+export type NextBestActionSignal<TLead extends ActionLead = ActionLead> = {
+  kind: NextBestActionSignalKind;
+  lead: TLead;
+  reason: string;
+  scheduledAt: Date | null;
+};
+
+type OperationalLead = ActionLead & {
+  questions: readonly { questionKey: string; answer: string }[];
+  whatsappSentAt: Date | null;
+  updatedAt: Date;
+};
+
+type OperationalReceivable = {
+  currency: string;
+  outstandingCents: number;
+  overdueCents: number;
+  nextDueOn: string | null;
 };
 
 export type NextBestActionUrgency = "critical" | "high" | "medium" | "low";
@@ -108,13 +136,16 @@ export async function resolveNextBestActionModes({
 
 const CALLER_ACTION_TYPES = new Set(["no_contact", "future_call", "follow_up"]);
 const CLOSER_ACTION_TYPES = new Set(["appointment", "sale", "rescheduled", "follow_up"]);
+const CALLER_SIGNAL_TYPES = new Set<NextBestActionSignalKind>(["whatsapp_pending", "hot_lead"]);
+const CLOSER_SIGNAL_TYPES = new Set<NextBestActionSignalKind>(["appointment_upcoming", "payment_due", "payment_overdue"]);
 
 export function actionTypeMatchesMode(actionType: string, mode: NextBestActionMode, targetRole?: string | null) {
   if (actionType === "follow_up") {
     if (targetRole === "role-caller") return mode === "caller";
     if (targetRole === "role-closer") return mode === "closer";
   }
-  return (mode === "caller" ? CALLER_ACTION_TYPES : CLOSER_ACTION_TYPES).has(actionType);
+  return (mode === "caller" ? CALLER_ACTION_TYPES : CLOSER_ACTION_TYPES).has(actionType)
+    || (mode === "caller" ? CALLER_SIGNAL_TYPES : CLOSER_SIGNAL_TYPES).has(actionType as NextBestActionSignalKind);
 }
 
 function alertMatchesMode(alert: ActionAlert<ActionLead>, mode: NextBestActionMode) {
@@ -168,6 +199,112 @@ const ALERT_BASE_SCORE: Record<string, number> = {
   sale: 100,
 };
 
+const SIGNAL_SCORE: Record<NextBestActionSignalKind, number> = {
+  payment_overdue: 140,
+  appointment_upcoming: 115,
+  hot_lead: 100,
+  payment_due: 90,
+  whatsapp_pending: 65,
+};
+
+export function buildSignalRecommendationKey(input: NextBestActionSignal) {
+  return `signal:${input.kind}:${input.lead.id}:${input.scheduledAt?.toISOString() ?? "current"}`;
+}
+
+export function parseSignalRecommendationKey(key: string) {
+  const match = /^signal:([a-z_]+):([^:]+):(.+)$/.exec(key);
+  if (!match?.[1] || !match[2] || !match[3]) return null;
+  const kind = match[1] as NextBestActionSignalKind;
+  if (!CALLER_SIGNAL_TYPES.has(kind) && !CLOSER_SIGNAL_TYPES.has(kind)) return null;
+  const scheduledAt = match[3] === "current" ? null : new Date(match[3]);
+  if (scheduledAt && Number.isNaN(scheduledAt.getTime())) return null;
+  return { kind, leadId: match[2], scheduledAt };
+}
+
+function hasPositiveContact(questions: OperationalLead["questions"]) {
+  return [...questions].reverse().some((item) =>
+    item.questionKey === "isContacted" && item.answer.trim().toLocaleLowerCase("es") === "si",
+  );
+}
+
+function money(cents: number, currency: string) {
+  return new Intl.NumberFormat("es-ES", { style: "currency", currency }).format(cents / 100);
+}
+
+function dueDate(value: string) {
+  return new Date(`${value}T00:00:00.000Z`);
+}
+
+export function deriveOperationalSignals<TLead extends OperationalLead>({
+  mode,
+  now,
+  leads,
+  receivables,
+}: {
+  mode: NextBestActionMode;
+  now: Date;
+  leads: readonly TLead[];
+  receivables: ReadonlyMap<string, OperationalReceivable>;
+}): NextBestActionSignal<TLead>[] {
+  const signals: NextBestActionSignal<TLead>[] = [];
+  for (const lead of leads) {
+    if (mode === "caller") {
+      if (lead.whatsappSentAt && now.getTime() - lead.whatsappSentAt.getTime() >= 24 * 60 * 60 * 1_000) {
+        signals.push({
+          kind: "whatsapp_pending",
+          lead,
+          reason: "WhatsApp enviado hace al menos 24 h sin respuesta registrada; comprueba el chat manualmente",
+          scheduledAt: lead.whatsappSentAt,
+        });
+      }
+      if (hasPositiveContact(lead.questions) && now.getTime() - lead.updatedAt.getTime() <= 72 * 60 * 60 * 1_000) {
+        signals.push({
+          kind: "hot_lead",
+          lead,
+          reason: "Respuesta positiva registrada en las últimas 72 h; confirma el siguiente paso",
+          scheduledAt: lead.updatedAt,
+        });
+      }
+      continue;
+    }
+
+    const receivable = receivables.get(lead.id);
+    if (!receivable || receivable.outstandingCents <= 0 || !receivable.nextDueOn) continue;
+    const overdue = receivable.overdueCents > 0;
+    signals.push({
+      kind: overdue ? "payment_overdue" : "payment_due",
+      lead,
+      reason: overdue
+        ? `Cobro vencido: ${money(receivable.overdueCents, receivable.currency)} pendientes`
+        : `Próximo cobro: ${money(receivable.outstandingCents, receivable.currency)} pendientes`,
+      scheduledAt: dueDate(receivable.nextDueOn),
+    });
+  }
+  return signals;
+}
+
+export async function listOperationalSignals({
+  actorId,
+  permissions,
+  mode,
+  now,
+}: {
+  actorId: string;
+  permissions: readonly Permission[];
+  mode: NextBestActionMode;
+  now: Date;
+}) {
+  const canSeeAll = permissions.includes("*");
+  const ownedLeads = await db.query.leads.findMany({
+    where: canSeeAll
+      ? undefined
+      : (table, { eq }) => eq(mode === "caller" ? table.callerId : table.closerId, actorId),
+    with: { caller: true, closer: true },
+  });
+  const receivables = mode === "closer" ? await listReceivableSummaries() : new Map<string, OperationalReceivable>();
+  return deriveOperationalSignals({ mode, now, leads: ownedLeads, receivables });
+}
+
 function urgencyForScore(score: number): NextBestActionUrgency {
   if (score >= 120) return "critical";
   if (score >= 90) return "high";
@@ -176,14 +313,22 @@ function urgencyForScore(score: number): NextBestActionUrgency {
 }
 
 function alertScore(alert: ActionAlert<ActionLead>, now: Date) {
-  if (alert.kind === "future_call") {
+  if (alert.kind === "future_call" || alert.kind === "appointment") {
     const remainingHours =
       (alert.nextShowAt.getTime() - now.getTime()) / (60 * 60 * 1000);
-    if (remainingHours <= 0) return 130;
+    if (alert.kind === "future_call") {
+      if (remainingHours <= 0) return 130;
+      if (remainingHours <= 2) return 110;
+      if (remainingHours <= 24) return 70;
+      return 30;
+    }
+    if (remainingHours <= 0) return 120;
     if (remainingHours <= 2) return 110;
-    if (remainingHours <= 24) return 70;
-    return 30;
+    if (remainingHours <= 24) return 90;
+    return 50;
   }
+
+  if (alert.kind === "follow_up" && alert.nextShowAt <= now) return 105;
 
   const severityBonus =
     alert.severity === "urgent" ? 20 : alert.severity === "warning" ? 10 : 0;
@@ -223,11 +368,13 @@ function mergeAction<TLead extends ActionLead>(
 export function buildNextBestActions<TLead extends ActionLead>({
   alerts,
   riskItems,
+  signals = [],
   now,
   mode = "caller",
 }: {
   alerts: readonly ActionAlert<TLead>[];
   riskItems: readonly ActionRiskItem<TLead>[];
+  signals?: readonly NextBestActionSignal<TLead>[];
   now: Date;
   mode?: NextBestActionMode;
 }): NextBestAction<TLead>[] {
@@ -278,6 +425,24 @@ export function buildNextBestActions<TLead extends ActionLead>({
     });
   }
 
+  const allowedSignals = mode === "caller" ? CALLER_SIGNAL_TYPES : CLOSER_SIGNAL_TYPES;
+  for (const signal of signals) {
+    if (!allowedSignals.has(signal.kind)) continue;
+    mergeAction(actions, {
+      lead: signal.lead,
+      actionType: signal.kind,
+      score: SIGNAL_SCORE[signal.kind],
+      reasons: [signal.reason],
+      scheduledAt: signal.scheduledAt,
+      attemptCount: null,
+      minutesSinceAssignment: null,
+      minutesSinceLastAttempt: null,
+      recommendationKey: buildSignalRecommendationKey(signal),
+      sourceAlertId: null,
+      workMode: mode,
+    });
+  }
+
   return [...actions.values()]
     .sort(
       (left, right) =>
@@ -310,7 +475,7 @@ export async function listNextBestActions({
     throw new Error("Requested work mode is not available to this authenticated role");
   }
   const canSeeAllAlerts = permissions.includes("*");
-  const [alerts, riskItems] = await Promise.all([
+  const [alerts, riskItems, signals] = await Promise.all([
     listAlerts({
       actorId,
       permissions: [...permissions],
@@ -318,6 +483,7 @@ export async function listNextBestActions({
       limit: 100,
     }),
     mode === "caller" ? listLeadRiskQueue({ actorId, permissions, now }) : Promise.resolve([]),
+    listOperationalSignals({ actorId, permissions, mode, now }),
   ]);
 
   const ownedAlerts = canSeeAllAlerts
@@ -329,7 +495,7 @@ export async function listNextBestActions({
       );
 
   const [actions, terminalKeys] = await Promise.all([
-    Promise.resolve(buildNextBestActions({ alerts: ownedAlerts, riskItems, now, mode })),
+    Promise.resolve(buildNextBestActions({ alerts: ownedAlerts, riskItems, signals, now, mode })),
     listSkippedRecommendationKeys({ actorId, permissions }),
   ]);
   return actions.filter((action) => !terminalKeys.has(action.recommendationKey));

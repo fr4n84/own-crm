@@ -1,4 +1,4 @@
-import { and, gte, lte, type SQL } from "@crm-fran/db";
+import { and, gte, isNull, lte, type SQL } from "@crm-fran/db";
 import { leads } from "@crm-fran/db/schema/index";
 import { selectLeadWithUsers } from "../queries/index";
 
@@ -67,5 +67,5 @@ export function buildDateWhere(dateRange?: DateRange): SQL | undefined {
 
 export async function getAll({ dateRange }: { dateRange?: DateRange } = {}) {
 	const where = buildDateWhere(dateRange);
-	return where ? selectLeadWithUsers(where) : selectLeadWithUsers();
+	return selectLeadWithUsers(and(isNull(leads.mergedIntoLeadId), where));
 }

@@ -55,6 +55,11 @@ vi.mock("@tanstack/react-query", async () => {
   };
 });
 
+vi.mock("./closer-meet-panel", () => ({
+  CloserMeetPanel: ({ leadId }: { leadId: string }) => (
+    <section data-testid="closer-meet-panel">{leadId}</section>
+  ),
+}));
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 const queryClient = new QueryClient();
@@ -72,6 +77,7 @@ describe("CloserQAForm — integración con el drawer", () => {
     expect(form.tagName).toBe("FORM");
     expect(form).toHaveAttribute("id", "closer-qa-form");
     expect(screen.getByLabelText("¿Qué ha ocurrido?")).toBeInTheDocument();
+    expect(screen.getByTestId("closer-meet-panel")).toHaveTextContent("lead-1");
   });
 
   it("does NOT render any submit button of its own (el padre controla el submit)", () => {

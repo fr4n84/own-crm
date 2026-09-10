@@ -14,8 +14,9 @@ describe("users and access visual contract", () => {
     expect(view).not.toContain("localStorage");
   });
 
-  it("explains the server authority and renders explicit states", () => {
-    expect(view).toContain("La API sigue siendo la autoridad");
+  it("explains which visibility choices affect server access and renders explicit states", () => {
+    expect(view).toContain("La selección del Observatorio comercial controla también su acceso en el servidor");
+    expect(view).toContain("El resto de módulos conserva sus permisos de API: esta matriz cambia su visibilidad");
     expect(view).toContain("Skeleton");
     expect(view).toContain("No se pudo cargar");
     expect(view).toContain("No hay usuarios");
@@ -27,6 +28,7 @@ describe("users and access visual contract", () => {
     expect(view).toContain("Guardar cambios");
     expect(view).toContain("Cancelar");
     expect(view).toContain("window.confirm");
-    expect(view).toContain("Los permisos de la API no cambiarán");
+    expect(view).toContain("En Observatorio comercial también se concederá o revocará acceso");
+    expect(view).toContain("los demás permisos no cambiarán");
   });
 });

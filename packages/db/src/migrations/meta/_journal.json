@@ -288,6 +288,62 @@
       "when": 1788635455254,
       "tag": "0040_user_access_lifecycle",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1788802051210,
+      "tag": "0041_lead_duplicates",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1788803601084,
+      "tag": "0042_receivables",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1788805905843,
+      "tag": "0043_payment_reconciliation",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1788807956414,
+      "tag": "0044_admin_data_exports",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1788830704302,
+      "tag": "0045_commercial_coaching",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1788905707668,
+      "tag": "0046_encrypted_meet_transcripts",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1788919840694,
+      "tag": "0047_email_marketing_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1788924689592,
+      "tag": "0048_team_presence",
+      "breakpoints": true
     }
   ]
 }

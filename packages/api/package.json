@@ -20,6 +20,7 @@
     "@trpc/client": "catalog:",
     "@trpc/server": "catalog:",
     "dotenv": "catalog:",
+    "google-auth-library": "^11.0.2",
     "next": "catalog:",
     "openai": "catalog:",
     "zod": "catalog:"

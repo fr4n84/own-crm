@@ -17,7 +17,10 @@
     "db:studio": "turbo -F @crm-fran/db db:studio",
     "db:generate": "turbo -F @crm-fran/db db:generate",
     "db:migrate": "turbo -F @crm-fran/db db:migrate",
-    "test:ui:account-dashboard": "pnpm --filter web exec vitest run src/features/profile/password-form.test.tsx src/components/app-access.test.tsx src/components/app-shell.test.tsx src/features/dashboard/conversion-funnel.test.tsx src/features/users-access/users-access-view.test.tsx"
+    "test:ui:account-dashboard": "pnpm --filter web exec vitest run src/features/profile/password-form.test.tsx src/components/app-access.test.tsx src/components/app-shell.test.tsx src/features/dashboard/conversion-funnel.test.tsx src/features/users-access/users-access-view.test.tsx",
+    "files:backup": "node scripts/local-data-backup.mjs backup",
+    "files:backup:verify": "node scripts/local-data-backup.mjs verify",
+    "files:restore:verify": "node scripts/local-data-backup.mjs restore-verify"
   },
   "dependencies": {
     "@crm-fran/env": "workspace:*",

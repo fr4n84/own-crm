@@ -23,6 +23,11 @@ import {
 import { permittedProcedure } from "@crm-fran/api/trpc/trpc";
 import { getMonthlyCallFeedbackUsage } from "../call-feedback-runtime";
 import { validateConfirmedFeedbackQuestions } from "../call-feedback";
+import {
+  dismissDuplicateCase,
+  listDuplicateCases,
+  mergeDuplicateCase,
+} from "../leads/duplicates/service";
 
 const idInput = z.object({ id: z.string() });
 export const createLeadInput = z.object({
@@ -188,6 +193,13 @@ export const assignLeadInput = z.union([
 );
 
 export const leadsRouter = router({
+  duplicateCases: permittedProcedure(["*"]).query(() => listDuplicateCases()),
+  mergeDuplicate: permittedProcedure(["*"])
+    .input(z.object({ caseId: z.string().min(1), canonicalLeadId: z.string().min(1) }))
+    .mutation(({ ctx, input }) => mergeDuplicateCase({ ...input, actorId: ctx.session.user.id })),
+  dismissDuplicate: permittedProcedure(["*"])
+    .input(z.object({ caseId: z.string().min(1) }))
+    .mutation(({ ctx, input }) => dismissDuplicateCase({ ...input, actorId: ctx.session.user.id })),
   observatoryFeedbackStatistics: observatoryProcedure(["leads:read"]).input(feedbackStatisticsInput).query(({input}) => getFeedbackStatistics(input)),
 	monthlyCallFeedbackUsage: permittedProcedure(["*"]).query(() =>
 		getMonthlyCallFeedbackUsage(),

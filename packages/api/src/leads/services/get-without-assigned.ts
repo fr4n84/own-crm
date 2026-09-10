@@ -21,6 +21,7 @@ export async function getWithoutAssigned({
     and(
       isNull(leads.callerId),
       isNull(leads.closerId),
+      isNull(leads.mergedIntoLeadId),
       eq(leads.type, type),
       eq(leads.poolStatus, poolStatus),
     ),

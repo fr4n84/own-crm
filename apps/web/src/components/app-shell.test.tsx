@@ -9,7 +9,8 @@ vi.mock("@/components/app-sidebar", () => ({ AppSidebar: () => <aside data-testi
 vi.mock("@/components/active-title", () => ({ ActiveTitle: () => null }));
 vi.mock("@/components/mode-toggle", () => ({ ModeToggle: () => null }));
 vi.mock("@/features/alerts/alert-button", () => ({ AlertButton: () => <span data-testid="private-alerts" /> }));
-vi.mock("@crm-fran/ui/components/site-header", () => ({ SiteHeader: ({ children }: { children?: React.ReactNode }) => <header>{children}</header> }));
+vi.mock("@/features/team-presence/team-presence", () => ({ TeamPresence: () => <span data-testid="team-presence" /> }));
+vi.mock("@crm-fran/ui/components/site-header", () => ({ SiteHeader: ({ children, alertButton }: { children?: React.ReactNode; alertButton?: React.ReactNode }) => <header>{children}{alertButton}</header> }));
 vi.mock("@crm-fran/ui/components/sidebar", () => ({
   SidebarProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   SidebarInset: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -49,6 +50,7 @@ describe("application shell", () => {
       expect(screen.getByText("Create Account")).toBeTruthy();
       expect(screen.queryByTestId("private-sidebar")).toBeNull();
       expect(screen.queryByTestId("private-alerts")).toBeNull();
+      expect(screen.queryByTestId("team-presence")).toBeNull();
     });
   }
   it("does not treat a similarly named route as public", () => {
@@ -60,5 +62,6 @@ describe("application shell", () => {
     mocks.pathname = "/";
     render(<AppShell><div>Panel</div></AppShell>);
     expect(screen.getByTestId("private-sidebar")).toBeTruthy();
+    expect(screen.getByTestId("team-presence")).toBeTruthy();
   });
 });

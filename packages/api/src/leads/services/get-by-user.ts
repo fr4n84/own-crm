@@ -1,4 +1,4 @@
-import { and, eq, or } from "@crm-fran/db";
+import { and, eq, isNull, or } from "@crm-fran/db";
 import { leads } from "@crm-fran/db/schema/index";
 import { selectLeadWithUsers } from "../queries/index";
 import { buildDateWhere, type DateRange } from "./get-all";
@@ -14,7 +14,7 @@ export async function getByUserId({
 	const dateFilter = dateRange ? buildDateWhere(dateRange) : undefined;
 
 	if (dateFilter) {
-		return await selectLeadWithUsers(and(userFilter, dateFilter));
+		return await selectLeadWithUsers(and(isNull(leads.mergedIntoLeadId), userFilter, dateFilter));
 	}
-	return await selectLeadWithUsers(userFilter);
+	return await selectLeadWithUsers(and(isNull(leads.mergedIntoLeadId), userFilter));
 }

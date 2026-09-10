@@ -1,6 +1,7 @@
 import { z } from "zod/v4";
 
 import { listCloserSales, updateCloserSaleRecord } from "../closer-sales/service";
+import { paymentReconciliationService } from "../payment-reconciliation/service";
 import { router } from "../index";
 import { permittedProcedure } from "../trpc/trpc";
 
@@ -21,6 +22,12 @@ const calendarDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(value);
 }, "Fecha inválida");
 const moneyCents = z.number().int().positive().max(2_147_483_647);
+const csvText = z.string().min(1).max(2 * 1024 * 1024);
+const profileId = z.string().min(1).max(100);
+const reconciliationResolutions = z.array(z.object({
+  externalReference: z.string().trim().min(1).max(300),
+  leadId: z.string().min(1),
+})).max(10_000);
 
 export const closerSaleUpdateInput = z.object({
   leadId: z.string().min(1),
@@ -67,4 +74,18 @@ export const closerSalesRouter = router({
       soldAt: new Date(`${input.soldOn}T12:00:00.000Z`),
       actorId: ctx.session.user.id,
     })),
+  reconciliationProfiles: permittedProcedure(["*"]).query(() => paymentReconciliationService.listProfiles()),
+  createReconciliationProfile: permittedProcedure(["*"])
+    .input(z.object({
+      providerKey: z.string().trim().regex(/^[a-z0-9][a-z0-9_-]{1,79}$/),
+      name: z.string().trim().min(1).max(120),
+    }))
+    .mutation(({ ctx, input }) => paymentReconciliationService.createProfile({ ...input, actorId: ctx.session.user.id })),
+  previewReconciliation: permittedProcedure(["*"])
+    .input(z.object({ profileId, csv: csvText }))
+    .mutation(({ input }) => paymentReconciliationService.preview(input)),
+  confirmReconciliation: permittedProcedure(["*"])
+    .input(z.object({ profileId, fileName: z.string().trim().min(1).max(255), csv: csvText, resolutions: reconciliationResolutions }))
+    .mutation(({ ctx, input }) => paymentReconciliationService.confirm({ ...input, actorId: ctx.session.user.id })),
+  cashRealizedReport: permittedProcedure(["*"]).query(() => paymentReconciliationService.cashRealizedReport()),
 });

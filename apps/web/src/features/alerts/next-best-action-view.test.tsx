@@ -50,8 +50,32 @@ describe("NextBestActionView", () => {
 
     expect(screen.getByText("Lead prioritario")).toBeInTheDocument();
     expect(screen.getByText("Llamada programada vencida")).toBeInTheDocument();
-    expect(screen.getByText("Puntuación 130")).toBeInTheDocument();
+    expect(screen.getByText("Crítica")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Gestionar ahora" })).toBeInTheDocument();
+  });
+
+  it("uses readable signal labels and routes collection work directly to sales", () => {
+    render(
+      <NextBestActionView
+        mode="closer"
+        actions={[{
+          position: 1,
+          lead,
+          actionType: "payment_overdue",
+          score: 140,
+          urgency: "critical",
+          reasons: ["Cobro vencido: 50,00 € pendientes"],
+          scheduledAt: "2026-08-20T00:00:00.000Z",
+          attemptCount: null,
+          minutesSinceAssignment: null,
+          minutesSinceLastAttempt: null,
+        }]}
+      />,
+    );
+
+    expect(screen.getByText("Gestionar cobro vencido")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Abrir Ventas" })).toHaveAttribute("href", "/ventas-closer");
+    expect(screen.queryByText(/Puntuación/)).not.toBeInTheDocument();
   });
 
   it("shows an empty state when there is no pending work", () => {

@@ -2,6 +2,7 @@ import type { Permission } from "@crm-fran/db/schema/auth";
 import { z } from "zod";
 
 import { hasPermission } from "./permissions";
+import { coachingAnalysisDraftSchema, type CoachingAnalysisDraft } from "./commercial-coaching/domain";
 
 export const TRANSCRIPTION_MODEL = "gpt-4o-mini-transcribe-2025-12-15";
 export const SUMMARY_MODEL = "gpt-4o-mini-2024-07-18";
@@ -246,6 +247,8 @@ export type CallFeedbackDependencies = {
     outputTokens: number;
   }>;
   recordUsage: (usage: CallFeedbackUsageRecord) => Promise<void>;
+  analyzeCoaching?: (transcript: string, feedbackRole: FeedbackRole) => Promise<{ draft: CoachingAnalysisDraft; inputTokens: number; outputTokens: number }>;
+  recordCoachingDraft?: (input: { actorId: string; analyzedUserId: string; leadId: string; role: FeedbackRole; draft: CoachingAnalysisDraft }) => Promise<{ id: string }>;
 };
 
 export async function processCallRecording({
@@ -282,10 +285,25 @@ export async function processCallRecording({
   const response = await dependencies.summarize(transcript, feedbackRole);
   const rawDraft = { ...JSON.parse(response.outputText), extraInfo: "" };
   const draft = feedbackRole === "closer" ? closerCallFeedbackDraftSchema.parse(rawDraft) : callFeedbackDraftSchema.parse(rawDraft);
+  let coaching: { id: string; draft: CoachingAnalysisDraft } | null = null;
+  let coachingInputTokens = 0;
+  let coachingOutputTokens = 0;
+  if (dependencies.analyzeCoaching && dependencies.recordCoachingDraft) {
+    try {
+      const coachingResult = await dependencies.analyzeCoaching(transcript, feedbackRole);
+      const coachingDraft = coachingAnalysisDraftSchema.parse(coachingResult.draft);
+      const created = await dependencies.recordCoachingDraft({ actorId: userId, analyzedUserId: userId, leadId, role: feedbackRole, draft: coachingDraft });
+      coaching = { id: created.id, draft: coachingDraft };
+      coachingInputTokens = coachingResult.inputTokens;
+      coachingOutputTokens = coachingResult.outputTokens;
+    } catch {
+      coaching = null;
+    }
+  }
   const estimatedCostMicroUsd = estimateCallFeedbackCostMicroUsd({
     durationMs,
-    summaryInputTokens: response.inputTokens,
-    summaryOutputTokens: response.outputTokens,
+    summaryInputTokens: response.inputTokens + coachingInputTokens,
+    summaryOutputTokens: response.outputTokens + coachingOutputTokens,
   });
 
   await dependencies.recordUsage({
@@ -300,6 +318,7 @@ export async function processCallRecording({
 
   return {
     draft,
+    coaching,
     usage: { durationMs, estimatedCostMicroUsd },
   };
 }

@@ -21,7 +21,8 @@ export type PrimaryNavigationItem = {
     | "calendar"
     | "messages"
     | "personal-statistics"
-    | "users-access";
+    | "users-access"
+    | "email-marketing";
   title: string;
   url: string;
   requiredPermission?: NavigationPermission;
@@ -50,6 +51,7 @@ export const PRIMARY_NAVIGATION_ITEMS = [
   { id: "messages", title: "Mensajes", url: "/messages" },
   { id: "personal-statistics", title: "Estadísticas personales", url: "/estadisticas-personales", requiredPermission: "leads:read" },
   { id: "users-access", title: "Usuarios y accesos", url: "/usuarios-accesos", globalOnly: true },
+  { id: "email-marketing", title: "Email Marketing", url: "/email-marketing", globalOnly: true },
 ] as const satisfies readonly PrimaryNavigationItem[];
 
 function hasPermission(permissions: readonly string[], requiredPermission: NavigationPermission) {

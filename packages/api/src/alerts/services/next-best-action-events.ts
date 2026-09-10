@@ -7,7 +7,7 @@ import {
   type LeadActivityMetadata,
 } from "@crm-fran/db/schema/index";
 import type { Permission } from "@crm-fran/db/schema/auth";
-import { actionTypeMatchesMode, buildAlertRecommendationKey, buildRiskRecommendationKey, type NextBestActionMode } from "./next-best-actions";
+import { actionTypeMatchesMode, buildAlertRecommendationKey, buildRiskRecommendationKey, buildSignalRecommendationKey, listOperationalSignals, parseSignalRecommendationKey, type NextBestActionMode } from "./next-best-actions";
 import { listLeadRiskQueue } from "./lead-risk-queue";
 import { COMMERCIAL_EVIDENCE_POLICY_VERSION, type EvidenceSnapshot } from "../../commercial-evidence/domain";
 import { buildEvidenceSnapshotForLead } from "../../commercial-evidence/service";
@@ -119,16 +119,25 @@ export async function recordRecommendationEvent(input: {
   const [sourceAlert] = parsedAlertKey ? await db.select({ id: alerts.id, kind: alerts.kind, targetUserId: alerts.targetUserId, nextShowAt: alerts.nextShowAt })
     .from(alerts).where(and(eq(alerts.leadId, input.leadId), eq(alerts.id, parsedAlertKey.alertId), eq(alerts.nextShowAt, parsedAlertKey.nextShowAt), isNull(alerts.dismissedAt), isNull(alerts.resolvedAt), isNull(alerts.expiredAt))) : [];
   const isBoundAlert = sourceAlert !== undefined && input.recommendationKey === buildAlertRecommendationKey({ alertId: sourceAlert.id, nextShowAt: sourceAlert.nextShowAt }) && (isPrivileged || sourceAlert.targetUserId === input.actorId);
-  const riskItems = input.kind === "recommendation_completed" || isBoundAlert ? [] : await listLeadRiskQueue({ actorId: input.actorId, permissions: input.permissions });
+  const parsedSignalKey = parseSignalRecommendationKey(input.recommendationKey);
+  const signalMode = parsedSignalKey && actionTypeMatchesMode(parsedSignalKey.kind, "caller") ? "caller" : "closer";
+  const currentSignals = input.kind === "recommendation_completed" || !parsedSignalKey
+    ? []
+    : await listOperationalSignals({ actorId: input.actorId, permissions: input.permissions, mode: signalMode, now: new Date() });
+  const boundSignal = currentSignals.find((signal) => signal.lead.id === input.leadId && buildSignalRecommendationKey(signal) === input.recommendationKey);
+  const riskItems = input.kind === "recommendation_completed" || isBoundAlert || boundSignal ? [] : await listLeadRiskQueue({ actorId: input.actorId, permissions: input.permissions });
   const isBoundRisk = riskItems.some((item) => item.lead.id === input.leadId && input.recommendationKey === buildRiskRecommendationKey({ leadId: item.lead.id, assignedAt: item.assignedAt, lastAttemptAt: item.lastAttemptAt }));
-  if (input.kind !== "recommendation_completed" && ((!canManageLead({ lead, actorId: input.actorId, permissions: input.permissions }) && !isBoundAlert) || (!isBoundAlert && !isBoundRisk))) {
+  if (!canManageLead({ lead, actorId: input.actorId, permissions: input.permissions }) && !isBoundAlert && !boundSignal) {
+    throw new Error("La recomendación ya no pertenece a tu cartera");
+  }
+  if (input.kind !== "recommendation_completed" && ((!canManageLead({ lead, actorId: input.actorId, permissions: input.permissions }) && !isBoundAlert && !boundSignal) || (!isBoundAlert && !isBoundRisk && !boundSignal))) {
     throw new Error("La recomendación ya no es válida para este lead");
   }
   if (input.kind === "recommendation_skipped" && !input.reason?.trim()) {
     throw new Error("Indica el motivo para omitir la recomendación");
   }
   const priorActionType = priorEvent ? (priorEvent.metadata as RecommendationMetadata).actionType ?? (input.recommendationKey.startsWith("risk:") ? "no_contact" : input.recommendationKey.startsWith("alert:") ? "alerta" : undefined) : undefined;
-  const boundActionType = sourceAlert?.kind ?? (isBoundRisk ? "no_contact" : priorActionType);
+  const boundActionType = sourceAlert?.kind ?? boundSignal?.kind ?? (isBoundRisk ? "no_contact" : priorActionType);
   if (!boundActionType) {
     throw new Error("No se pudo vincular el tipo de acción de la recomendación");
   }

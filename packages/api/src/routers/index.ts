@@ -3,6 +3,7 @@ import { leadsRouter } from "./leads";
 import { usersRouter } from "./users";
 import { alertsRouter } from "./alerts";
 import { calendarRouter } from "./calendar";
+import { closerMeetRouter } from "./closer-meet";
 import { messagesRouter } from "./messages";
 import { rankingsRouter } from "./rankings";
 import { dashboardRouter } from "./dashboard";
@@ -19,7 +20,10 @@ import { askCrmRouter } from "./ask-crm";
 import { marketingAttributionRouter } from "./marketing-attribution";
 import { closerSalesRouter } from "./closer-sales";
 import { whatsappRouter } from "./whatsapp";
+import { commercialCoachingRouter } from "./commercial-coaching";
 import { suggestionsRouter } from "./suggestions";
+import { emailMarketingRouter } from "./email-marketing";
+import { teamPresenceRouter } from "./team-presence";
 import { permittedProcedure } from "@crm-fran/api/trpc/trpc";
 import { publicProcedure, router } from "../index";
 
@@ -47,6 +51,7 @@ export const appRouter = router({
   users: usersRouter,
   alerts: alertsRouter,
   calendar: calendarRouter,
+  closerMeet: closerMeetRouter,
   messages: messagesRouter,
   rankings: rankingsRouter,
   dashboard: dashboardRouter,
@@ -63,6 +68,9 @@ export const appRouter = router({
   marketingAttribution: marketingAttributionRouter,
   closerSales: closerSalesRouter,
   whatsapp: whatsappRouter,
+  commercialCoaching: commercialCoachingRouter,
   suggestions: suggestionsRouter,
+  emailMarketing: emailMarketingRouter,
+  teamPresence: teamPresenceRouter,
 });
 export type AppRouter = typeof appRouter;

@@ -7,6 +7,7 @@ import {
   text,
   json,
   timestamp,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 import { LEAD_STATE, type LeadState } from "./state";
@@ -47,7 +48,9 @@ export const leads = pgTable("leads", {
     id: text("id").primaryKey(),
     name: text("name").notNull(),
 	    email: text("email"),
+	    normalizedEmail: text("normalized_email"),
 	    phone: text("phone").notNull(),
+	    normalizedPhone: text("normalized_phone"),
 	    source: text("source"),
 	    campaign: text("campaign"),
 	    ad: text("ad"),
@@ -69,6 +72,12 @@ export const leads = pgTable("leads", {
     callerId: text("caller_id").references(() => user.id, { onDelete: "set null" }),
     callerAssignedAt: timestamp("caller_assigned_at", { withTimezone: true }),
     closerId: text("closer_id").references(() => user.id, { onDelete: "set null" }),
+    mergedIntoLeadId: text("merged_into_lead_id").references(
+      (): AnyPgColumn => leads.id,
+      { onDelete: "restrict" },
+    ),
+    mergedAt: timestamp("merged_at", { withTimezone: true }),
+    mergedById: text("merged_by_id").references(() => user.id, { onDelete: "restrict" }),
     poolStatus: text("pool_status")
       .$type<LeadPoolStatus>()
       .default(LEAD_POOL_STATUS.NEW)
@@ -86,6 +95,10 @@ export const leads = pgTable("leads", {
       .notNull(),
 }, (table) => [
   index("leads_whatsapp_caller_idx").on(table.whatsappCallerId),
+	index("leads_normalized_email_idx").on(table.normalizedEmail),
+	index("leads_normalized_phone_idx").on(table.normalizedPhone),
+	index("leads_merged_into_idx").on(table.mergedIntoLeadId),
+	check("leads_merge_shape_check", sql`(${table.mergedIntoLeadId} IS NULL AND ${table.mergedAt} IS NULL AND ${table.mergedById} IS NULL) OR (${table.mergedIntoLeadId} IS NOT NULL AND ${table.mergedAt} IS NOT NULL AND ${table.mergedById} IS NOT NULL AND ${table.mergedIntoLeadId} <> ${table.id})`),
 	check("leads_type_check", sql`${table.type} IN ('maestra', 'vsl')`),
 	check(
     "leads_pool_status_check",

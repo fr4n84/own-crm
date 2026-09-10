@@ -13,7 +13,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@crm-fran/ui/components/sidebar"
-import { CircleAlertIcon, HouseIcon, ChartBarIcon, CalendarDaysIcon, ChartNoAxesCombinedIcon, CameraIcon, FileTextIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon, MessageSquareIcon, ListChecksIcon, BadgeEuroIcon, GoalIcon, ChartSplineIcon, UsersIcon, HandshakeIcon, MessageCircleIcon, LightbulbIcon } from "lucide-react"
+import { CircleAlertIcon, HouseIcon, ChartBarIcon, CalendarDaysIcon, ChartNoAxesCombinedIcon, CameraIcon, FileTextIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon, MessageSquareIcon, ListChecksIcon, BadgeEuroIcon, GoalIcon, ChartSplineIcon, UsersIcon, HandshakeIcon, MessageCircleIcon, LightbulbIcon, MailIcon } from "lucide-react"
 import { usePermissions, useRole } from "@crm-fran/ui/permissions"
 import type { Permission } from "@crm-fran/db/schema/auth"
 import {
@@ -47,7 +47,7 @@ const SIDEBAR_NAVIGATION_GROUPS = [
   },
   {
     label: "Administración",
-    itemIds: ["decision-center", "users-access"],
+    itemIds: ["decision-center", "users-access", "email-marketing"],
   },
 ] as const
 
@@ -86,6 +86,7 @@ const NAVIGATION_ICONS: Record<PrimaryNavigationItem["id"], React.ReactNode> = {
   messages: <MessageSquareIcon />,
   "personal-statistics": <ChartNoAxesCombinedIcon />,
   "users-access": <UsersIcon />,
+  "email-marketing": <MailIcon />,
 }
 
 const data = {

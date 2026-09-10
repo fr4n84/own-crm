@@ -9,6 +9,7 @@ import { TRPCError } from "@trpc/server";
 
 import { classifySaleEvidence } from "./domain";
 import { buildSaleFinancialPlan } from "./financial-plan";
+import { listReceivableSummaries, syncReceivableAccount } from "../receivables/service";
 
 export type ContractFileInput = {
   storageKey: string;
@@ -60,6 +61,7 @@ export async function listCloserSales() {
     .leftJoin(closer, eq(closer.id, leads.closerId))
     .leftJoin(closerSaleRecords, eq(closerSaleRecords.leadId, leads.id));
 
+  const receivables = await listReceivableSummaries();
   return rows.flatMap((row) => {
     const evidence = classifySaleEvidence(row);
     if (!evidence) return [];
@@ -68,6 +70,7 @@ export async function listCloserSales() {
     return [{
       ...row,
       saleEvidence: evidence,
+      receivable: receivables.get(row.id) ?? null,
       record: hasRecord
         ? {
             ...record,
@@ -242,6 +245,16 @@ export async function updateCloserSaleRecord(input: {
         set: values,
       })
       .returning();
+    await syncReceivableAccount(tx, {
+      leadId: input.leadId,
+      actorId: input.actorId,
+      contractedAmountCents: input.saleAmountCents,
+      amountPaidCents: input.amountPaidCents,
+      currency: input.currency,
+      soldAt: input.soldAt,
+      installmentCount: input.paymentMethod === "financed" ? input.installmentMonths ?? 1 : 1,
+      paymentEventId: paymentReceivedEventId,
+    });
     return record!;
   });
 }

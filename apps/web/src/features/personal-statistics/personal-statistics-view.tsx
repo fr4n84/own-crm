@@ -67,6 +67,7 @@ import {
 } from "./personal-statistics-filters";
 import { PersonalGoalsPanel } from "./personal-goals-panel";
 import { CallFeedbackUsageCard } from "./call-feedback-usage-card";
+import { CommercialCoachingPanel } from "./commercial-coaching-panel";
 import styles from "./personal-statistics.module.css";
 
 const initialPeople = { callerId: "all", closerId: "all" };
@@ -312,6 +313,8 @@ export function PersonalStatisticsView() {
       </Card>
 
       <CallFeedbackUsageCard />
+
+      <CommercialCoachingPanel targetUserId={people.callerId !== "all" ? people.callerId : people.closerId !== "all" ? people.closerId : undefined} />
 
       <PersonalGoalsPanel
         selectedUserId={

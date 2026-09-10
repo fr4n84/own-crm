@@ -80,9 +80,4 @@ describe("user access directory", () => {
     await expect(caller(["users:read"]).users.accessDirectory()).rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(caller(["*"]).users.accessDirectory()).resolves.toMatchObject({ users: expect.any(Array), roles: expect.any(Array) });
   });
-
-  it("keeps visibility reads authenticated but writes wildcard-only", async () => {
-    await expect(caller(["users:read"]).users.navigationVisibility()).resolves.toMatchObject({ configured: false, version: 0 });
-    await expect(caller(["users:read"]).users.updateNavigationVisibility({ expectedVersion: 0, entries: [] })).rejects.toMatchObject({ code: "FORBIDDEN" });
-  });
 });

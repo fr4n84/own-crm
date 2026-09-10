@@ -16,6 +16,9 @@
     "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio",
     "db:migrate": "drizzle-kit migrate",
+    "db:backup": "tsx scripts/backup-postgres.ts",
+    "db:backup:verify": "tsx scripts/verify-postgres-backup.ts",
+    "db:restore:verify": "tsx scripts/verify-postgres-restore.ts",
     "check-types": "tsc --noEmit --composite false --incremental false"
   },
   "dependencies": {

@@ -1,6 +1,6 @@
 ﻿import { describe, expect, it } from "vitest";
 
-import { availableNextBestActionModes, buildNextBestActions } from "./next-best-actions";
+import { availableNextBestActionModes, buildNextBestActions, deriveOperationalSignals } from "./next-best-actions";
 
 const now = new Date("2026-08-22T12:00:00.000Z");
 const lead = (id: string, name: string) => ({
@@ -10,6 +10,110 @@ const lead = (id: string, name: string) => ({
 });
 
 describe("next best actions", () => {
+  it("derives only evidence-backed WhatsApp and hot-lead signals", () => {
+    const signals = deriveOperationalSignals({
+      mode: "caller",
+      now,
+      leads: [
+        {
+          ...lead("wa", "WhatsApp pendiente"),
+          questions: [],
+          whatsappSentAt: new Date("2026-08-21T11:00:00.000Z"),
+          updatedAt: new Date("2026-08-21T11:00:00.000Z"),
+        },
+        {
+          ...lead("hot", "Lead caliente"),
+          questions: [{ questionKey: "isContacted", answer: "Si" }],
+          whatsappSentAt: null,
+          updatedAt: new Date("2026-08-22T10:00:00.000Z"),
+        },
+      ],
+      receivables: new Map(),
+    });
+
+    expect(signals.map(({ kind, lead: item }) => [kind, item.id])).toEqual([
+      ["whatsapp_pending", "wa"],
+      ["hot_lead", "hot"],
+    ]);
+    expect(signals[0]?.reason).toContain("sin respuesta registrada");
+    expect(signals[1]?.reason).toContain("Respuesta positiva registrada");
+  });
+
+  it("derives due and overdue collection work from immutable receivable state", () => {
+    const receivables = new Map([
+      ["overdue", { currency: "EUR", outstandingCents: 5_000, overdueCents: 5_000, nextDueOn: "2026-08-20" }],
+      ["due", { currency: "EUR", outstandingCents: 8_000, overdueCents: 0, nextDueOn: "2026-08-23" }],
+    ]);
+    const leads = [
+      { ...lead("overdue", "Cobro vencido"), questions: [], whatsappSentAt: null, updatedAt: now },
+      { ...lead("due", "Cobro próximo"), questions: [], whatsappSentAt: null, updatedAt: now },
+    ];
+
+    const signals = deriveOperationalSignals({ mode: "closer", now, leads, receivables });
+
+    expect(signals.map(({ kind, lead: item }) => [kind, item.id])).toEqual([
+      ["payment_overdue", "overdue"],
+      ["payment_due", "due"],
+    ]);
+    expect(signals[0]?.reason).toBe("Cobro vencido: 50,00 € pendientes");
+  });
+
+  it("ranks typed operational signals transparently and keeps one action per lead", () => {
+    const sameLead = lead("same", "Lead con varias señales");
+    const otherLead = lead("other", "Lead WhatsApp");
+    const actions = buildNextBestActions({
+      now,
+      alerts: [],
+      riskItems: [],
+      mode: "closer",
+      signals: [
+        {
+          kind: "payment_due",
+          lead: sameLead,
+          reason: "Próxima cuota pendiente",
+          scheduledAt: null,
+        },
+        {
+          kind: "payment_overdue",
+          lead: sameLead,
+          reason: "Cuota vencida: 50,00 EUR pendientes",
+          scheduledAt: new Date("2026-08-20T00:00:00.000Z"),
+        },
+        {
+          kind: "whatsapp_pending",
+          lead: otherLead,
+          reason: "WhatsApp enviado sin respuesta registrada desde hace 24 h",
+          scheduledAt: new Date("2026-08-21T12:00:00.000Z"),
+        },
+      ],
+    });
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toMatchObject({
+      actionType: "payment_overdue",
+      urgency: "critical",
+      scheduledAt: new Date("2026-08-20T00:00:00.000Z"),
+      reasons: [
+        "Próxima cuota pendiente",
+        "Cuota vencida: 50,00 EUR pendientes",
+      ],
+    });
+    expect(actions[0]?.recommendationKey).toContain("signal:payment_overdue:same:");
+  });
+
+  it("keeps caller and closer operational signals in their owned work modes", () => {
+    const callerLead = lead("caller-signal", "Caller signal");
+    const closerLead = { ...lead("closer-signal", "Closer signal"), closer: { id: "closer-1", name: "Closer" } };
+    const signals = [
+      { kind: "whatsapp_pending" as const, lead: callerLead, reason: "WhatsApp pendiente", scheduledAt: now },
+      { kind: "appointment_upcoming" as const, lead: closerLead, reason: "Agenda próxima", scheduledAt: now },
+      { kind: "payment_due" as const, lead: closerLead, reason: "Cuota pendiente", scheduledAt: now },
+    ];
+
+    expect(buildNextBestActions({ now, alerts: [], riskItems: [], signals, mode: "caller" }).map(({ actionType }) => actionType)).toEqual(["whatsapp_pending"]);
+    expect(buildNextBestActions({ now, alerts: [], riskItems: [], signals, mode: "closer" }).map(({ actionType }) => actionType)).toEqual(["appointment_upcoming"]);
+  });
+
   it("only exposes work modes the authenticated role can exercise", () => {
     expect(availableNextBestActionModes({ roleId: "role-caller", permissions: ["alerts:read"] })).toEqual(["caller"]);
     expect(availableNextBestActionModes({ roleId: "role-closer", permissions: ["alerts:read"] })).toEqual(["closer"]);
@@ -119,6 +223,25 @@ describe("next best actions", () => {
       recommendationKey: "alert:alert-1:2026-08-22T11:00:00.000Z",
       sourceAlertId: "alert-1",
     });
+  });
+
+  it("raises overdue follow-ups and appointments approaching within two hours", () => {
+    const closerLead = { ...lead("agenda-soon", "Agenda próxima"), closer: { id: "closer-1", name: "Closer" } };
+    const closerActions = buildNextBestActions({
+      now,
+      mode: "closer",
+      riskItems: [],
+      alerts: [{ id: "agenda", lead: closerLead, kind: "appointment", severity: "info", message: "Agenda dentro de una hora", nextShowAt: new Date("2026-08-22T13:00:00.000Z") }],
+    });
+    const callerActions = buildNextBestActions({
+      now,
+      mode: "caller",
+      riskItems: [],
+      alerts: [{ id: "follow", lead: lead("follow-overdue", "Seguimiento"), kind: "follow_up", severity: "info", message: "Seguimiento vencido", nextShowAt: new Date("2026-08-22T11:00:00.000Z") }],
+    });
+
+    expect(closerActions[0]).toMatchObject({ actionType: "appointment", score: 110, urgency: "high" });
+    expect(callerActions[0]).toMatchObject({ actionType: "follow_up", score: 105, urgency: "high" });
   });
 
   it("deduplicates a lead and keeps every reason used by the ranking", () => {
@@ -254,5 +377,3 @@ it("uses the assignment and last-attempt epoch in risk recommendation keys", () 
   })[0];
   expect(action?.recommendationKey).toBe("risk:epoch:2026-08-22T08:00:00.000Z:2026-08-22T10:00:00.000Z");
 });
-
-

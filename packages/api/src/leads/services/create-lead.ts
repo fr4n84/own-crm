@@ -9,6 +9,8 @@ import {
 } from "@crm-fran/db/schema/index";
 import { appendLeadActivity } from "./lead-activity";
 import { resolveLeadMarketingAttribution } from "../../marketing-attribution/service";
+import { configuredLeadPhoneCountry, normalizeLeadEmail, normalizeLeadPhone } from "@crm-fran/db/lead-identity";
+import { createDuplicateCasesForLead } from "../duplicates/service";
 
 export type CreateLeadInput = {
   name: string;
@@ -45,9 +47,18 @@ export function leadCreatedAttributionMetadata(
 
 export async function createLead(input: CreateLeadInput) {
   return db.transaction(async (tx) => {
+    const email = normalizeLeadEmail(input.email);
+    const phone = normalizeLeadPhone(input.phone, configuredLeadPhoneCountry());
     const [lead] = await tx
       .insert(leads)
-      .values({ id: crypto.randomUUID(), ...input })
+      .values({
+        id: crypto.randomUUID(),
+        ...input,
+        email: email.original,
+        normalizedEmail: email.normalized,
+        phone: phone.original,
+        normalizedPhone: phone.normalized,
+      })
       .returning();
 
     if (!lead) {
@@ -68,6 +79,8 @@ export async function createLead(input: CreateLeadInput) {
       { matchKind: MARKETING_ATTRIBUTION_MATCH_KIND.AUTOMATIC },
     );
     const resolvedLead = attribution ? { ...lead, ...attribution } : lead;
+
+    await createDuplicateCasesForLead(tx, lead);
 
     await appendLeadActivity(tx, {
       leadId: lead.id,

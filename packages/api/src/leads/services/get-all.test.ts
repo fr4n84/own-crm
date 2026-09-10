@@ -4,25 +4,41 @@ vi.mock("../queries/index", () => ({
 	selectLeadWithUsers: vi.fn().mockResolvedValue([]),
 }));
 
+vi.mock("@crm-fran/db", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("@crm-fran/db")>();
+	return {
+		...actual,
+		isNull: vi.fn(actual.isNull),
+	};
+});
+
+import { isNull } from "@crm-fran/db";
+import { leads } from "@crm-fran/db/schema/index";
 import { getAll } from "./get-all";
 import { selectLeadWithUsers } from "../queries/index";
 
+const mockIsNull = vi.mocked(isNull);
 const mockSelect = vi.mocked(selectLeadWithUsers);
 
 describe("getAll", () => {
 	beforeEach(() => {
+		mockIsNull.mockClear();
 		mockSelect.mockClear();
 	});
 
 	describe("without dateRange", () => {
-		it("calls selectLeadWithUsers with no WHERE clause", async () => {
+		it("applies the default filter that excludes merged leads", async () => {
 			await getAll();
-			expect(mockSelect).toHaveBeenCalledWith();
+			expect(mockIsNull).toHaveBeenCalledWith(leads.mergedIntoLeadId);
+			expect(mockSelect).toHaveBeenCalledTimes(1);
+			expect(mockSelect.mock.calls[0]?.[0]).toBeDefined();
 		});
 
-		it("calls selectLeadWithUsers with no WHERE when dateRange is empty object", async () => {
+		it("keeps the merged-lead filter when dateRange is empty", async () => {
 			await getAll({ dateRange: {} });
-			expect(mockSelect).toHaveBeenCalledWith();
+			expect(mockIsNull).toHaveBeenCalledWith(leads.mergedIntoLeadId);
+			expect(mockSelect).toHaveBeenCalledTimes(1);
+			expect(mockSelect.mock.calls[0]?.[0]).toBeDefined();
 		});
 	});
 
