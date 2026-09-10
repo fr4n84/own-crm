@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { Route } from "next";
 
 import { Badge } from "@crm-fran/ui/components/badge";
-import { Button } from "@crm-fran/ui/components/button";
+import { Button, buttonVariants } from "@crm-fran/ui/components/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@crm-fran/ui/components/card";
 import { Empty } from "@crm-fran/ui/components/empty";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm-fran/ui/components/table";
@@ -126,7 +126,7 @@ export function NextBestActionView({
         </CardContent>
         <CardFooter className="flex flex-wrap gap-2">
           {firstDirectAction
-            ? <Button render={<Link href={firstDirectAction.href} aria-label={firstDirectAction.label} />} onClick={() => onOpen?.(first)}>{firstDirectAction.label}</Button>
+            ? <Link className={buttonVariants()} href={firstDirectAction.href} aria-label={firstDirectAction.label} onClick={() => onOpen?.(first)}>{firstDirectAction.label}</Link>
             : <AssignLeadDrawer lead={first.lead} mode={drawerMode} triggerLabel="Gestionar ahora" onOpen={() => onOpen?.(first)} onCompleted={() => onCompleted?.(first)} />}
           {onSkip && <Button variant="ghost" type="button" aria-label={`Omitir ${first.lead.name}`} onClick={() => onSkip(first)}><SkipForwardIcon aria-hidden="true" /><span className="max-md:sr-only">Omitir</span></Button>}
         </CardFooter>
@@ -151,7 +151,7 @@ export function NextBestActionView({
                   <TableCell>{action.lead.phone}</TableCell>
                   <TableCell className="max-md:hidden">{ACTION_LABELS[action.actionType] ?? "Gestionar lead"}</TableCell>
                   <TableCell className="max-w-80 whitespace-normal text-muted-foreground max-md:hidden">{action.reasons[0]}</TableCell>
-                  <TableCell><div className="flex flex-wrap gap-1"><LeadViewDrawer lead={action.lead} triggerAriaLabel={`Ver detalles de ${action.lead.name}`} />{directAction(action) ? <Button size="sm" render={<Link href={directAction(action)!.href} aria-label={directAction(action)!.label} />} onClick={() => onOpen?.(action)}>{directAction(action)!.label}</Button> : <AssignLeadDrawer lead={action.lead} mode={drawerMode} triggerLabel="Gestionar" onOpen={() => onOpen?.(action)} onCompleted={() => onCompleted?.(action)} />}{onSkip && <Button variant="ghost" size="sm" type="button" aria-label={`Omitir ${action.lead.name}`} onClick={() => onSkip(action)}><SkipForwardIcon aria-hidden="true" /><span className="max-md:sr-only">Omitir</span></Button>}</div></TableCell>
+                  <TableCell><div className="flex flex-wrap gap-1"><LeadViewDrawer lead={action.lead} triggerAriaLabel={`Ver detalles de ${action.lead.name}`} />{directAction(action) ? <Link className={buttonVariants({ size: "sm" })} href={directAction(action)!.href} aria-label={directAction(action)!.label} onClick={() => onOpen?.(action)}>{directAction(action)!.label}</Link> : <AssignLeadDrawer lead={action.lead} mode={drawerMode} triggerLabel="Gestionar" onOpen={() => onOpen?.(action)} onCompleted={() => onCompleted?.(action)} />}{onSkip && <Button variant="ghost" size="sm" type="button" aria-label={`Omitir ${action.lead.name}`} onClick={() => onSkip(action)}><SkipForwardIcon aria-hidden="true" /><span className="max-md:sr-only">Omitir</span></Button>}</div></TableCell>
                 </TableRow>
               ))}
               {remainingActions.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No hay más acciones pendientes.</TableCell></TableRow>}
