@@ -18,6 +18,7 @@ import { Input } from "@crm-fran/ui/components/input";
 import { Skeleton } from "@crm-fran/ui/components/skeleton";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@crm-fran/ui/components/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm-fran/ui/components/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@crm-fran/ui/components/tabs";
 
 import { trpc } from "@/utils/trpc";
 import { describeReceivable, formatReceivableMoney } from "./receivable-label";
@@ -25,6 +26,7 @@ import { PaymentReconciliationPanel } from "./payment-reconciliation-panel";
 import { AdminExportPanel } from "./admin-export-panel";
 import { formatSalePaymentPlan } from "./sale-payment-label";
 import { SaleVoidDialog } from "./sale-void-dialog";
+import { ImpagosPanel } from "./impagos-panel";
 
 type ContractFile = {
   storageKey: string;
@@ -196,6 +198,12 @@ export function CloserSalesView() {
         <p className="text-sm text-muted-foreground">Centraliza contrato, llamada de venta y onboarding de cada lead vendido.</p>
       </header>
 
+      <Tabs defaultValue="portfolio">
+        <TabsList aria-label="Secciones de ventas closer">
+          <TabsTrigger value="portfolio">Cartera</TabsTrigger>
+          <TabsTrigger value="delinquencies">Impagos</TabsTrigger>
+        </TabsList>
+        <TabsContent value="portfolio" className="flex flex-col gap-4">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <Metric title="Ventas" value={rows.length} />
         <Metric title="Contratado" value={formatCurrencyTotals(totals, "contractedCents")} />
@@ -234,6 +242,11 @@ export function CloserSalesView() {
       </Card>
       <PaymentReconciliationPanel />
       <AdminExportPanel />
+        </TabsContent>
+        <TabsContent value="delinquencies">
+          <ImpagosPanel />
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={Boolean(editor)} onOpenChange={(open) => { if (!open) setEditor(null); }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
