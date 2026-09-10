@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   findDuplicateSignals,
+  isExactTripleDuplicate,
   normalizeLeadEmail,
   normalizeLeadPhone,
+  selectUniqueExactTripleDuplicate,
 } from "./lead-identity";
 
 describe("lead identity normalization", () => {
@@ -44,5 +46,32 @@ describe("lead identity normalization", () => {
         { name: "Jose Peres", normalizedEmail: null, normalizedPhone: null },
       ),
     ).toMatchObject({ reasons: ["similar_name"], level: "warning" });
+  });
+  it("auto-merges only a complete exact normalized identity", () => {
+    expect(isExactTripleDuplicate(
+      { name: " María-López ", normalizedEmail: "maria@example.com", normalizedPhone: "+34612345678" },
+      { name: "maria lopez", normalizedEmail: "maria@example.com", normalizedPhone: "+34612345678" },
+    )).toBe(true);
+    expect(isExactTripleDuplicate(
+      { name: "María López", normalizedEmail: "maria@example.com", normalizedPhone: "+34612345678" },
+      { name: "María López", normalizedEmail: "other@example.com", normalizedPhone: "+34612345678" },
+    )).toBe(false);
+    expect(isExactTripleDuplicate(
+      { name: "María López", normalizedEmail: null, normalizedPhone: "+34612345678" },
+      { name: "María López", normalizedEmail: null, normalizedPhone: "+34612345678" },
+    )).toBe(false);
+    expect(selectUniqueExactTripleDuplicate(
+      { name: "María López", normalizedEmail: "maria@example.com", normalizedPhone: "+34612345678" },
+      [
+        { id: "unique", name: "maria lopez", normalizedEmail: "maria@example.com", normalizedPhone: "+34612345678" },
+      ],
+    )?.id).toBe("unique");
+    expect(selectUniqueExactTripleDuplicate(
+      { name: "María López", normalizedEmail: "maria@example.com", normalizedPhone: "+34612345678" },
+      [
+        { id: "first", name: "maria lopez", normalizedEmail: "maria@example.com", normalizedPhone: "+34612345678" },
+        { id: "second", name: "MARÍA LÓPEZ", normalizedEmail: "maria@example.com", normalizedPhone: "+34612345678" },
+      ],
+    )).toBeNull();
   });
 });

@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 
-import { db } from "@crm-fran/db";
+import { db, eq } from "@crm-fran/db";
 import {
   leads,
   LEAD_ACTIVITY_KIND,
@@ -45,7 +45,7 @@ export function leadCreatedAttributionMetadata(
   };
 }
 
-export async function createLead(input: CreateLeadInput) {
+export async function createLead(input: CreateLeadInput, actorId: string) {
   return db.transaction(async (tx) => {
     const email = normalizeLeadEmail(input.email);
     const phone = normalizeLeadPhone(input.phone, configuredLeadPhoneCountry());
@@ -80,8 +80,6 @@ export async function createLead(input: CreateLeadInput) {
     );
     const resolvedLead = attribution ? { ...lead, ...attribution } : lead;
 
-    await createDuplicateCasesForLead(tx, lead);
-
     await appendLeadActivity(tx, {
       leadId: lead.id,
       kind: LEAD_ACTIVITY_KIND.LEAD_CREATED,
@@ -94,6 +92,22 @@ export async function createLead(input: CreateLeadInput) {
       dedupeKey: `lead_created:${lead.id}`,
       occurredAt: lead.createdAt,
     });
+
+    const duplicateResolution = await createDuplicateCasesForLead(tx, lead, actorId);
+    if (duplicateResolution.autoMerged) {
+      const [canonical] = await tx
+        .select()
+        .from(leads)
+        .where(eq(leads.id, duplicateResolution.autoMerged.canonicalLeadId))
+        .limit(1);
+      if (!canonical) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "No se pudo recuperar el lead principal tras la fusión automática",
+        });
+      }
+      return canonical;
+    }
 
     return resolvedLead;
   });

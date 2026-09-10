@@ -27,9 +27,36 @@ import {
   dismissDuplicateCase,
   listDuplicateCases,
   mergeDuplicateCase,
+  mergeDuplicateBatch,
 } from "../leads/duplicates/service";
 
 const idInput = z.object({ id: z.string() });
+export const duplicateCasesInput = z.object({
+  cursor: z.object({
+    createdAt: z.string().datetime({ offset: true }),
+    id: z.string().min(1).max(100),
+  }).optional(),
+  pageSize: z.number().int().min(1).max(50).default(20),
+});
+const duplicateBatchEntryInput = z.object({
+  caseId: z.string().min(1).max(100),
+  canonicalLeadId: z.string().min(1).max(100),
+});
+export const mergeDuplicateBatchInput = z.object({
+  entries: z.array(duplicateBatchEntryInput).min(1).max(50),
+}).superRefine((value, context) => {
+  const seen = new Set<string>();
+  value.entries.forEach((entry, index) => {
+    if (seen.has(entry.caseId)) {
+      context.addIssue({
+        code: "custom",
+        message: "Un caso no puede aparecer dos veces en el mismo lote",
+        path: ["entries", index, "caseId"],
+      });
+    }
+    seen.add(entry.caseId);
+  });
+});
 export const createLeadInput = z.object({
   name: z.string(),
   email: z.email(),
@@ -193,10 +220,15 @@ export const assignLeadInput = z.union([
 );
 
 export const leadsRouter = router({
-  duplicateCases: permittedProcedure(["*"]).query(() => listDuplicateCases()),
+  duplicateCases: permittedProcedure(["*"])
+    .input(duplicateCasesInput.optional())
+    .query(({ input }) => listDuplicateCases(input ?? {})),
   mergeDuplicate: permittedProcedure(["*"])
-    .input(z.object({ caseId: z.string().min(1), canonicalLeadId: z.string().min(1) }))
+    .input(duplicateBatchEntryInput)
     .mutation(({ ctx, input }) => mergeDuplicateCase({ ...input, actorId: ctx.session.user.id })),
+  mergeDuplicateBatch: permittedProcedure(["*"])
+    .input(mergeDuplicateBatchInput)
+    .mutation(({ ctx, input }) => mergeDuplicateBatch({ ...input, actorId: ctx.session.user.id })),
   dismissDuplicate: permittedProcedure(["*"])
     .input(z.object({ caseId: z.string().min(1) }))
     .mutation(({ ctx, input }) => dismissDuplicateCase({ ...input, actorId: ctx.session.user.id })),
@@ -290,8 +322,8 @@ export const leadsRouter = router({
 
   create: permittedProcedure(["leads:write"])
     .input(createLeadInput)
-    .mutation(async ({ input }) => {
-      return await createLead(input);
+    .mutation(async ({ ctx, input }) => {
+      return await createLead(input, ctx.session.user.id);
     }),
 
   update: permittedProcedure(["leads:write"])

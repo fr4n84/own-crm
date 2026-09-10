@@ -35,7 +35,7 @@ export function normalizeLeadPhone(value: string, country: "ES" = "ES") {
   return { original, normalized };
 }
 
-function comparableName(value: string) {
+export function normalizeLeadName(value: string) {
   return value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -44,6 +44,28 @@ function comparableName(value: string) {
     .trim();
 }
 
+export function isExactTripleDuplicate(
+  incoming: NormalizedLeadIdentity,
+  existing: NormalizedLeadIdentity,
+) {
+  const incomingName = normalizeLeadName(incoming.name);
+  return Boolean(
+    incomingName
+    && incoming.normalizedEmail
+    && incoming.normalizedPhone
+    && incomingName === normalizeLeadName(existing.name)
+    && incoming.normalizedEmail === existing.normalizedEmail
+    && incoming.normalizedPhone === existing.normalizedPhone,
+  );
+}
+
+export function selectUniqueExactTripleDuplicate<T extends NormalizedLeadIdentity>(
+  incoming: NormalizedLeadIdentity,
+  candidates: readonly T[],
+): T | null {
+  const exact = candidates.filter((candidate) => isExactTripleDuplicate(incoming, candidate));
+  return exact.length === 1 ? exact[0] ?? null : null;
+}
 function levenshtein(left: string, right: string) {
   const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
   for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
@@ -62,8 +84,8 @@ function levenshtein(left: string, right: string) {
 }
 
 export function leadNameSimilarity(left: string, right: string) {
-  const a = comparableName(left);
-  const b = comparableName(right);
+  const a = normalizeLeadName(left);
+  const b = normalizeLeadName(right);
   if (!a || !b) return 0;
   return Math.round((1 - levenshtein(a, b) / Math.max(a.length, b.length)) * 100);
 }

@@ -125,7 +125,7 @@ describe("marketing attribution service", () => {
       source: "Meta Ads",
       utmContent,
       type: "maestra",
-    });
+    }, actorId);
     leadIds.push(futureLead.id);
     expect(futureLead.campaign).toBe("Campaign test");
     expect(futureLead.creative).toBe("Creative test");
