@@ -2,6 +2,7 @@ import { z } from "zod/v4";
 
 import { listCloserSales, updateCloserSaleRecord, voidCloserSale } from "../closer-sales/service";
 import { paymentReconciliationService } from "../payment-reconciliation/service";
+import { listDelinquencies, recordCollectionFollowUp } from "../receivables/delinquency-service";
 import { router } from "../index";
 import { permittedProcedure } from "../trpc/trpc";
 
@@ -69,8 +70,27 @@ export const closerSaleVoidInput = z.object({
   reason: z.string().trim().min(1).max(1_000),
   operationId: z.uuid(),
 });
+export const collectionFollowUpInput = z.object({
+  installmentId: z.string().min(1),
+  operationId: z.uuid(),
+  contactNote: z.string().trim().min(1).max(1_000),
+  nextActionOn: calendarDay,
+  nextActionNote: z.string().trim().min(1).max(1_000),
+});
+
 export const closerSalesRouter = router({
   list: permittedProcedure(["sales:read"]).query(() => listCloserSales()),
+  delinquencies: permittedProcedure(["sales:read"]).query(({ ctx }) => listDelinquencies({
+    actorId: ctx.session.user.id,
+    canReadAll: ctx.permissions.includes("*"),
+  })),
+  recordCollectionFollowUp: permittedProcedure(["sales:write"])
+    .input(collectionFollowUpInput)
+    .mutation(({ ctx, input }) => recordCollectionFollowUp({
+      ...input,
+      actorId: ctx.session.user.id,
+      canManageAll: ctx.permissions.includes("*"),
+    })),
   update: permittedProcedure(["sales:write"])
     .input(closerSaleUpdateInput)
     .mutation(({ ctx, input }) => updateCloserSaleRecord({
