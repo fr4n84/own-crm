@@ -25,23 +25,41 @@ vi.mock("@crm-fran/ui/permissions/can", () => ({
   Can: ({ children }: { children: React.ReactNode }) => children,
 }));
 
+vi.mock("@/features/leads/lead-view-drawer", () => ({
+  default: ({ triggerAriaLabel }: { triggerAriaLabel?: string }) => (
+    <button type="button" aria-label={triggerAriaLabel}>Ver</button>
+  ),
+}));
+
+vi.mock("@/features/agendas/agenda-reschedule-dialog", () => ({
+  AgendaRescheduleDialog: () => <button type="button">Reagendar</button>,
+}));
+
+vi.mock("@/features/leads/assign-lead-drawer", () => ({
+  default: () => <button type="button">Feedback</button>,
+}));
+
 vi.mock("@crm-fran/ui/components/data-table", () => ({
   DataTable: ({
     data,
     columns,
   }: {
-    data: { id: string; name: string; phone?: string; feedback?: string }[];
-    columns: { header?: string }[];
-  }) => (
-    <div data-testid="agenda-table">
-      <div>{columns.map((column) => column.header).join("|")}</div>
-      {data.map((row) => (
-        <div key={row.id}>
-          {row.name} {row.phone} {row.feedback}
-        </div>
-      ))}
-    </div>
-  ),
+    data: { id: string; name: string; phone?: string }[];
+    columns: { id?: string; header?: string; cell?: (input: { row: { original: { id: string; name: string; phone?: string } } }) => React.ReactNode }[];
+  }) => {
+    const actions = columns.find((column) => column.id === "actions");
+    return (
+      <div data-testid="agenda-table">
+        <div>{columns.map((column) => column.header).join("|")}</div>
+        {data.map((row) => (
+          <div key={row.id}>
+            {row.name} {row.phone}
+            {actions?.cell?.({ row: { original: row } })}
+          </div>
+        ))}
+      </div>
+    );
+  },
 }));
 
 vi.mock("@crm-fran/ui/components/empty", () => ({
@@ -87,10 +105,12 @@ describe("AgendasPage", () => {
     render(<AgendasPage />);
 
     expect(screen.getByTestId("agenda-table")).toHaveTextContent(
-      "Lead|Teléfono|Caller|Feedback del caller|Closer|Feedback closer|Fecha|Hora|Acciones",
+      "Lead|Teléfono|Caller|Closer|Fecha|Hora|Acciones",
     );
     expect(screen.getByText(/Agenda Lead/)).toBeInTheDocument();
-    expect(screen.getByText(/555-0100 Caller feedback/)).toBeInTheDocument();
+    expect(screen.getByText(/555-0100/)).toBeInTheDocument();
+    expect(screen.queryByText("Caller feedback")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ver feedback de Agenda Lead" })).toBeInTheDocument();
     expect(screen.queryByText("Other Lead")).not.toBeInTheDocument();
     expect(mocks.listAllQueryOptions).toHaveBeenCalledWith();
     expect(

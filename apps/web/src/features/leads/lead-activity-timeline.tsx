@@ -76,6 +76,26 @@ export function attributionChangeSummary(metadata: Record<string, unknown>) {
   });
 }
 
+type ActivityFeedbackQuestion = { question: string; answer: string };
+
+export function feedbackQuestionsFromMetadata(
+  metadata: Record<string, unknown>,
+): ActivityFeedbackQuestion[] {
+  if (!Array.isArray(metadata.questions)) return [];
+
+  return metadata.questions.flatMap((candidate) => {
+    if (typeof candidate !== "object" || candidate === null) return [];
+    const item = candidate as Record<string, unknown>;
+    const question = typeof item.question === "string" && item.question.trim()
+      ? item.question
+      : typeof item.questionKey === "string" && item.questionKey.trim()
+        ? item.questionKey
+        : null;
+    if (!question || typeof item.answer !== "string") return [];
+    return [{ question, answer: item.answer }];
+  });
+}
+
 export function LeadActivityTimeline({
   leadId,
   enabled,
@@ -117,6 +137,9 @@ export function LeadActivityTimeline({
     <ol className="flex flex-col" aria-label="Historial del lead">
       {events.map((event, index) => {
         const Icon = ICON_BY_KIND[event.kind];
+        const feedbackQuestions = event.kind === "caller_feedback" || event.kind === "closer_feedback"
+          ? feedbackQuestionsFromMetadata(event.metadata)
+          : [];
         return (
           <li key={event.id} className="flex gap-3">
             <div className="flex flex-col items-center">
@@ -148,6 +171,18 @@ export function LeadActivityTimeline({
                     </li>
                   ))}
                 </ul>
+              ) : null}
+              {feedbackQuestions.length > 0 ? (
+                <dl className="flex flex-col gap-2 rounded-lg border p-3" aria-label={`Respuestas de ${event.title}`}>
+                  {feedbackQuestions.map((question, questionIndex) => (
+                    <div key={`${event.id}:${questionIndex}`} className="flex flex-col gap-1">
+                      <dt className="text-sm font-medium">{question.question}</dt>
+                      <dd className="whitespace-pre-wrap break-words text-sm text-muted-foreground">
+                        {question.answer || "Sin respuesta"}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
               ) : null}
               <p className="text-xs text-muted-foreground">
                 {formatActivityDate(event.occurredAt)}

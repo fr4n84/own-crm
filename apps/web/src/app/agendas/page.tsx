@@ -139,6 +139,7 @@ function AgendasPageContent() {
           })),
           feedback: lead.feedback,
         }}
+        triggerAriaLabel={`Ver feedback de ${lead.name}`}
       />
       <AgendaRescheduleDialog lead={lead} />
       <AssignLeadDrawer

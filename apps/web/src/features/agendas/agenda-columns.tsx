@@ -22,22 +22,10 @@ export function createAgendaColumns(
       cell: ({ row }) => row.original.caller?.name ?? "Sin asignar",
     },
     {
-      accessorKey: "feedback",
-      meta: { mobileHidden: true },
-      header: "Feedback del caller",
-      cell: ({ row }) => row.original.feedback ?? "Sin feedback",
-    },
-    {
       accessorKey: "closer",
       meta: { mobileHidden: true },
       header: "Closer",
       cell: ({ row }) => row.original.closer?.name ?? "Sin asignar",
-    },
-    {
-      accessorKey: "closerOutcome",
-      meta: { mobileHidden: true },
-      header: "Feedback closer",
-      cell: ({ row }) => row.original.closerOutcome ?? "Sin feedback",
     },
     {
       accessorKey: "scheduledDate",
