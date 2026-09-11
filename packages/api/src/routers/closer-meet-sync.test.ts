@@ -2,9 +2,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Context } from "../context";
 
-const mocks = vi.hoisted(() => ({ run: vi.fn(), createRuntime: vi.fn() }));
-vi.mock("../closer-meet/repository", () => ({ closerMeetRepository: {} }));
-vi.mock("../google-workspace/runtime", () => ({ createGoogleWorkspaceClientFromEnv: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  createRuntime: vi.fn(),
+  createWorkspace: vi.fn(),
+  getLeadContext: vi.fn(),
+  listByLead: vi.fn(),
+  run: vi.fn(),
+}));
+vi.mock("../closer-meet/repository", () => ({ closerMeetRepository: { getLeadContext: mocks.getLeadContext, listByLead: mocks.listByLead } }));
+vi.mock("../google-workspace/runtime", () => ({ createGoogleWorkspaceClientFromEnv: mocks.createWorkspace }));
 vi.mock("../closer-meet/recording-sync-runtime", () => ({
   createCloserMeetRecordingSyncRuntime: mocks.createRuntime,
 }));
@@ -28,6 +34,14 @@ describe("Closer Meet recording sync boundary", () => {
     vi.clearAllMocks();
     mocks.createRuntime.mockReturnValue({ run: mocks.run });
     mocks.run.mockResolvedValue({ synced: 1, errors: [] });
+    mocks.createWorkspace.mockReturnValue(undefined);
+    mocks.getLeadContext.mockResolvedValue({ leadId: "lead-1", closerId: "u", closerEmail: "u@example.com", contactEmail: null });
+    mocks.listByLead.mockResolvedValue([{ id: "meeting-1", hasTranscript: true }]);
+  });
+
+  it("lists stored recording and transcript availability without requiring live Workspace configuration", async () => {
+    await expect(closerMeetRouter.createCaller(context(["sales:read"])).list({ leadId: "lead-1" })).resolves.toEqual([{ id: "meeting-1", hasTranscript: true }]);
+    expect(mocks.createWorkspace).not.toHaveBeenCalled();
   });
 
   it("rejects authenticated non-admin callers before starting sync", async () => {

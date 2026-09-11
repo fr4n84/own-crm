@@ -167,9 +167,9 @@ A provider resource-name change requires fetching the new transcript and atomica
 
 Rotation is not automatic: deploy code/config able to decrypt the old key ID, re-encrypt rows in a reviewed bounded operation, verify counts/authentication, then retire the old key. DO NOT replace or destroy the old key before re-encryption completes. Loss of every copy of a referenced key makes those transcripts unrecoverable; this is an intentional cryptographic consequence, not a repairable database failure.
 
-Authorized Closers may read/analyze only sessions assigned to them. Wildcard administrators and identities with `coaching:read` may access transcripts for legitimate coaching. Every request revalidates database ownership; client-provided Drive/Meet IDs are never trusted. The default panel exposes only a stored-status badge, not plaintext.
+Authorized Closers may read/analyze only sessions assigned to them; wildcard administrators are the only cross-user exception. The broader `coaching:read` permission does not grant transcript access. Every request revalidates database ownership; client-provided Drive/Meet IDs are never trusted. The default panel exposes only availability metadata. Plaintext is fetched only after **Ver transcripción**, rendered only in that deliberate detail, and immediately removed from the TanStack Query cache.
 
-Joint analysis selects at most five latest transcripts server-side and rejects more than 100,000 plaintext characters. OpenAI receives authorized plaintext transiently through the Responses API with `store:false` and a strict structured schema. The response must state uncertainties and `requiresHumanReview: true`; raw prompts/responses are not persisted. `store:false` limits OpenAI application storage but is not a promise of legal compliance or zero provider-side processing risk. Video/audio are never sent to OpenAI by this flow.
+Joint analysis runs only after **Generar coaching con IA**, selects at most five latest transcripts server-side, rejects more than 100,000 plaintext characters, and fails closed if those transcripts belong to different Closers. OpenAI receives authorized plaintext transiently through the Responses API with `store:false` and the existing commercial-coaching structured schema. Only the structured draft is stored in `commercial_coaching_analyses`; transcript text and the draft body are not returned by the Meet mutation. The Closer or Admin must review the draft in **Estadísticas personales → Coaching con IA** and explicitly confirm or discard it. `store:false` limits OpenAI application storage but is not a promise of legal compliance or zero provider-side processing risk. Video/audio are never sent to OpenAI by this flow.
 
 ## Transcript lifecycle, consent, and manual rights
 
@@ -190,4 +190,13 @@ Transcript review checklist:
 - [ ] Scheduler overlap prevention, bounded pagination (10 pages/1,000 entries/200,000 characters), and alerts are configured.
 - [ ] OpenAI requests use `store:false`, five-transcript/100,000-character limits, structured output, explicit uncertainty, and human review.
 - [ ] Consent/notice and manual access/deletion processes are documented; no claim of automatic legal compliance is made.
+## User-visible transcript and coaching prerequisites
 
+The stored history remains readable when live Google Workspace configuration is absent, but each mutating/runtime action fails closed:
+
+- Scheduling and recording synchronization require the Google Workspace service account, delegated user, Calendar ID, and private Shared Drive ID.
+- Transcript read and analysis require `CLOSER_MEET_TRANSCRIPT_KEY` and `CLOSER_MEET_TRANSCRIPT_KEY_ID`.
+- AI coaching requires `OPENAI_API_KEY`; no analysis runs automatically or during listing.
+- Migrations `0045_commercial_coaching.sql` and `0046_encrypted_meet_transcripts.sql` must be applied, including the seeded `closer-v1` rubric.
+
+If any prerequisite is absent, keep the feature disabled, surface the server precondition message, and do not substitute another provider, plaintext storage, or client-side analysis.

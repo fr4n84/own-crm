@@ -70,7 +70,7 @@ type WorkspaceMeetClient = {
 
 export function createCloserMeetService(input: {
   repository: CloserMeetRepository;
-  workspace: WorkspaceMeetClient;
+  workspace: WorkspaceMeetClient | null;
 }) {
   async function requireLeadAccess(command: { actorId: string; isAdmin: boolean; leadId: string }) {
     const context = await input.repository.getLeadContext(command.leadId);
@@ -106,8 +106,11 @@ export function createCloserMeetService(input: {
         return existing;
       }
 
+      const workspace = input.workspace;
+      if (!workspace) throw new Error("Google Workspace integration is not configured");
+
       const context = await requireLeadAccess(command);
-      const meeting = await input.workspace.createCloserMeeting({
+      const meeting = await workspace.createCloserMeeting({
         leadId: context.leadId,
         closerId: context.closerId,
         closerEmail: context.closerEmail,
@@ -130,7 +133,7 @@ export function createCloserMeetService(input: {
         });
       } catch (error) {
         try {
-          await input.workspace.deleteCalendarEvent(meeting.calendarEventId);
+          await workspace.deleteCalendarEvent(meeting.calendarEventId);
         } catch {
           // Preserve the persistence error; orphan cleanup can be retried operationally.
         }

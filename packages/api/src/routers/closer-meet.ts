@@ -29,7 +29,7 @@ export const createCloserMeetInput = z.object({
   ),
 }).and(madridLocalScheduleSchema);
 
-function createService() {
+function createWriteService() {
   const workspace = createGoogleWorkspaceClientFromEnv();
   if (!workspace) {
     throw new TRPCError({
@@ -45,7 +45,7 @@ export const closerMeetRouter = router({
     .input(z.object({ leadId: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
       try {
-        return await createService().list({
+        return await createCloserMeetService({ repository: closerMeetRepository, workspace: null }).list({
           ...input,
           actorId: ctx.session.user.id,
           isAdmin: ctx.permissions.includes("*"),
@@ -65,7 +65,7 @@ export const closerMeetRouter = router({
     .input(createCloserMeetInput)
     .mutation(async ({ ctx, input }) => {
       try {
-        return await createService().create({
+        return await createWriteService().create({
           operationId: input.operationId,
           leadId: input.leadId,
           startsAt: parseMadridLocalDateTime(

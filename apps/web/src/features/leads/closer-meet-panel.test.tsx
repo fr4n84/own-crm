@@ -7,8 +7,11 @@ import { CloserMeetPanel } from "./closer-meet-panel";
 afterEach(() => cleanup());
 
 const mocks = vi.hoisted(() => ({
+  analyzeMutateAsync: vi.fn(),
+  fetchQuery: vi.fn(),
   invalidateQueries: vi.fn(),
-  mutateAsync: vi.fn(),
+  removeQueries: vi.fn(),
+  scheduleMutateAsync: vi.fn(),
   queryState: {
     data: [] as unknown[],
     isLoading: false,
@@ -25,6 +28,17 @@ vi.mock("@/utils/trpc", () => ({
       create: {
         mutationOptions: vi.fn(() => ({ mutationKey: ["closerMeet", "create"] })),
       },
+      readTranscript: {
+        queryOptions: vi.fn((input) => ({ queryKey: ["closerMeet", "readTranscript", input] })),
+      },
+      analyzeTranscripts: {
+        mutationOptions: vi.fn(() => ({ mutationKey: ["closerMeet", "analyzeTranscripts"] })),
+      },
+    },
+    commercialCoaching: {
+      list: {
+        queryKey: vi.fn(() => ["commercialCoaching", "list"]),
+      },
     },
   },
 }));
@@ -34,9 +48,13 @@ vi.mock("@tanstack/react-query", async () => {
   return {
     ...actual,
     useQuery: vi.fn(() => mocks.queryState),
-    useQueryClient: vi.fn(() => ({ invalidateQueries: mocks.invalidateQueries })),
-    useMutation: vi.fn(() => ({
-      mutateAsync: mocks.mutateAsync,
+    useQueryClient: vi.fn(() => ({
+      fetchQuery: mocks.fetchQuery,
+      invalidateQueries: mocks.invalidateQueries,
+      removeQueries: mocks.removeQueries,
+    })),
+    useMutation: vi.fn((options: { mutationKey?: string[] }) => ({
+      mutateAsync: options.mutationKey?.includes("analyzeTranscripts") ? mocks.analyzeMutateAsync : mocks.scheduleMutateAsync,
       isPending: false,
       error: null,
     })),
@@ -47,7 +65,9 @@ describe("CloserMeetPanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.queryState = { data: [], isLoading: false, error: null };
-    mocks.mutateAsync.mockResolvedValue({ id: "meeting-1" });
+    mocks.scheduleMutateAsync.mockResolvedValue({ id: "meeting-1" });
+    mocks.analyzeMutateAsync.mockResolvedValue({ analysisId: "analysis-1", status: "draft", requiresHumanReview: true });
+    mocks.fetchQuery.mockResolvedValue({ sessionId: "meeting-1", transcript: "Contenido sensible visible solo tras solicitarlo.", characterCount: 49 });
     vi.stubGlobal("crypto", {
       randomUUID: vi.fn(() => "11111111-1111-4111-8111-111111111111"),
     });
@@ -64,7 +84,7 @@ describe("CloserMeetPanel", () => {
     await user.click(screen.getByRole("button", { name: "Programar Google Meet" }));
 
     await waitFor(() => {
-      expect(mocks.mutateAsync).toHaveBeenCalledWith({
+      expect(mocks.scheduleMutateAsync).toHaveBeenCalledWith({
         operationId: "11111111-1111-4111-8111-111111111111",
         leadId: "lead-1",
         scheduledDate: "2026-09-15",
@@ -115,6 +135,34 @@ describe("CloserMeetPanel", () => {
     expect(screen.queryByText(/sensitive transcript/i)).not.toBeInTheDocument();
   });
 
+  it("carga la transcripción solo tras una acción deliberada y la elimina de la caché", async () => {
+    const user = userEvent.setup();
+    mocks.queryState = { isLoading: false, error: null, data: [{ id: "meeting-1", status: "recording_ready", scheduledStart: new Date("2026-09-15T08:30:00.000Z"), scheduledEnd: new Date("2026-09-15T09:15:00.000Z"), meetingUri: null, calendarEventUrl: null, driveExportUri: null, hasTranscript: true }] };
+    render(<CloserMeetPanel leadId="lead-1" />);
+
+    expect(screen.queryByText(/contenido sensible visible/i)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Ver transcripción" }));
+
+    expect(await screen.findByText(/contenido sensible visible/i)).toBeInTheDocument();
+    expect(mocks.fetchQuery).toHaveBeenCalledWith({ queryKey: ["closerMeet", "readTranscript", { sessionId: "meeting-1" }] });
+    expect(mocks.removeQueries).toHaveBeenCalledWith({ queryKey: ["closerMeet", "readTranscript", { sessionId: "meeting-1" }], exact: true });
+    await user.click(screen.getByRole("button", { name: "Cerrar transcripción" }));
+    expect(screen.queryByText(/contenido sensible visible/i)).not.toBeInTheDocument();
+  });
+
+  it("genera coaching solo bajo petición y enlaza el borrador privado existente", async () => {
+    const user = userEvent.setup();
+    mocks.queryState = { isLoading: false, error: null, data: [{ id: "meeting-1", status: "recording_ready", scheduledStart: new Date("2026-09-15T08:30:00.000Z"), scheduledEnd: new Date("2026-09-15T09:15:00.000Z"), meetingUri: null, calendarEventUrl: null, driveExportUri: null, hasTranscript: true }] };
+    render(<CloserMeetPanel leadId="lead-1" />);
+
+    expect(mocks.analyzeMutateAsync).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Generar coaching con IA" }));
+
+    expect(mocks.analyzeMutateAsync).toHaveBeenCalledWith({ leadId: "lead-1" });
+    expect(await screen.findByRole("link", { name: "Revisar coaching privado" })).toHaveAttribute("href", "/estadisticas-personales#coaching-personal");
+    expect(mocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["commercialCoaching", "list"] });
+  });
+
   it("presenta estados de carga, error y vacío", () => {
     mocks.queryState = { data: [], isLoading: true, error: null };
     const { rerender } = render(<CloserMeetPanel leadId="lead-1" />);
@@ -129,8 +177,3 @@ describe("CloserMeetPanel", () => {
     expect(screen.getByText("Todavía no hay llamadas programadas.")).toBeInTheDocument();
   });
 });
-
-
-
-
-

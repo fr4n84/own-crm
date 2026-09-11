@@ -7,9 +7,10 @@ import { buildCoachingCohortComparison, coachingAnalysisDraftSchema, selectCoach
 const has = (permissions: readonly Permission[], permission: Permission) => permissions.includes("*") || permissions.includes("coaching:*") || permissions.includes(permission);
 export function canReadCoaching(input: { actorId: string; targetUserId: string; permissions: readonly Permission[] }) { return input.actorId === input.targetUserId || has(input.permissions, "coaching:read"); }
 export function canReviewCoaching(input: { actorId: string; targetUserId: string; permissions: readonly Permission[] }) { return input.actorId === input.targetUserId || has(input.permissions, "coaching:review"); }
+export function canGenerateCoaching(input: { actorId: string; targetUserId: string; permissions: readonly Permission[] }) { return input.actorId === input.targetUserId || input.permissions.includes("*"); }
 
-export async function recordCoachingDraft(input: { actorId: string; analyzedUserId: string; leadId: string; role: CoachingRole; draft: CoachingAnalysisDraft }) {
-  if (input.actorId !== input.analyzedUserId) throw new Error("Coaching drafts can only be generated for the authenticated agent");
+export async function recordCoachingDraft(input: { actorId: string; analyzedUserId: string; leadId: string; role: CoachingRole; draft: CoachingAnalysisDraft; permissions?: readonly Permission[] }) {
+  if (!canGenerateCoaching({ actorId: input.actorId, targetUserId: input.analyzedUserId, permissions: input.permissions ?? [] })) throw new Error("Coaching drafts can only be generated for the authenticated agent or an administrator");
   const draft = coachingAnalysisDraftSchema.parse(input.draft);
   const [lead, rubrics] = await Promise.all([
     db.query.leads.findFirst({ columns: { id: true, campaign: true }, where: (table, { eq }) => eq(table.id, input.leadId) }),

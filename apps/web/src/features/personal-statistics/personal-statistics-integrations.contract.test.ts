@@ -18,4 +18,9 @@ describe("Personal statistics integrations", () => {
     expect(navigation).toContain("after:hidden");
     expect(navigation).not.toContain('variant="line"');
   });
+
+  it("links the statistics header to the single existing private coaching section", () => {
+    expect(read("personal-statistics-navigation.tsx")).toContain('href="#coaching-personal"');
+    expect(read("commercial-coaching-panel.tsx")).toContain('id="coaching-personal"');
+  });
 });

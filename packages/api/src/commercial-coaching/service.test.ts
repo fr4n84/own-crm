@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canReadCoaching, canReviewCoaching } from "./service";
+import { canGenerateCoaching, canReadCoaching, canReviewCoaching } from "./service";
 
 describe("commercial coaching access", () => {
   it("keeps analysis private to its agent unless Admin or an explicit coach is authorized", () => {
@@ -13,5 +13,11 @@ describe("commercial coaching access", () => {
     expect(canReviewCoaching({ actorId: "agent", targetUserId: "agent", permissions: [] })).toBe(true);
     expect(canReviewCoaching({ actorId: "coach", targetUserId: "agent", permissions: ["coaching:review"] })).toBe(true);
     expect(canReviewCoaching({ actorId: "viewer", targetUserId: "agent", permissions: ["coaching:read"] })).toBe(false);
+  });
+
+  it("allows Meet coaching generation only for the analyzed Closer or Admin", () => {
+    expect(canGenerateCoaching({ actorId: "agent", targetUserId: "agent", permissions: [] })).toBe(true);
+    expect(canGenerateCoaching({ actorId: "admin", targetUserId: "agent", permissions: ["*"] })).toBe(true);
+    expect(canGenerateCoaching({ actorId: "coach", targetUserId: "agent", permissions: ["coaching:read", "coaching:review"] })).toBe(false);
   });
 });
