@@ -28,3 +28,4 @@ export * from "./payment-reconciliation";
 export * from "./admin-exports";
 export * from "./email-marketing";
 export * from "./team-presence";
+export * from "./whatsapp";

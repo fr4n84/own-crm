@@ -5,6 +5,7 @@ import { CheckIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { Badge } from "@crm-fran/ui/components/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@crm-fran/ui/components/card";
 import { Checkbox } from "@crm-fran/ui/components/checkbox";
 import { Empty } from "@crm-fran/ui/components/empty";
@@ -17,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@crm-fran/ui/component
 import { usePermissions } from "@crm-fran/ui/permissions";
 
 import { trpc } from "@/utils/trpc";
+import { WhatsappMessagePreparation, type WhatsappPreparationRow } from "./message-preparation-dialog";
 
 type QueueStatus = "pending" | "sent";
 
@@ -40,7 +42,7 @@ function defaultFrom() {
 export function WhatsappQueue() {
   const queryClient = useQueryClient();
   const permissions = usePermissions();
-  const canMarkSent = permissions.includes("*")
+  const canWrite = permissions.includes("*")
     || permissions.includes("leads:*")
     || permissions.includes("leads:write");
   const [status, setStatus] = useState<QueueStatus>("pending");
@@ -58,16 +60,20 @@ export function WhatsappQueue() {
     callerId: callerId === "all" ? undefined : callerId,
   };
   const queue = useQuery(trpc.whatsapp.list.queryOptions(input));
+  const deliveryCapability = useQuery(trpc.whatsapp.deliveryCapability.queryOptions());
+  const refreshWhatsapp = async () => {
+    await queryClient.invalidateQueries({ queryKey: trpc.whatsapp.list.queryKey() });
+  };
   const markSent = useMutation(trpc.whatsapp.markSent.mutationOptions({
     onMutate: ({ leadId, sent }) => {
       setOptimisticSent((current) => ({ ...current, [leadId]: sent }));
     },
     onSuccess: (_result, { leadId, sent }) => {
-      const message = sent ? "Marcado como enviado" : "Devuelto a pendientes";
+      const message = sent ? "Marcado como enviado manualmente" : "Devuelto a pendientes";
       setConfirmation(message);
       toast.success(message);
       removalTimers.current.push(setTimeout(() => {
-        void queryClient.invalidateQueries({ queryKey: trpc.whatsapp.list.queryKey() });
+        void refreshWhatsapp();
         setOptimisticSent((current) => {
           const next = { ...current };
           delete next[leadId];
@@ -81,7 +87,7 @@ export function WhatsappQueue() {
         delete next[leadId];
         return next;
       });
-      setConfirmation("No se pudo actualizar el envío");
+      setConfirmation("No se pudo actualizar el envío manual");
       toast.error(error.message);
     },
   }));
@@ -94,12 +100,24 @@ export function WhatsappQueue() {
       ? <Empty heading={status === "pending" ? "No quedan envíos pendientes" : "No hay envíos en este intervalo"} description="Prueba con otro intervalo o caller." />
       : <>
           <div className="grid gap-2 md:hidden">
-            {rows.map((row) => <QueueCard key={row.id} row={{ ...row, whatsappSentAt: optimisticSent[row.id] ?? row.whatsappSentAt !== null ? row.whatsappSentAt ?? new Date().toISOString() : null }} disabled={!canMarkSent || markSent.isPending} onChange={(sent) => markSent.mutate({ leadId: row.id, sent })} />)}
+            {rows.map((row) => {
+              const isSent = optimisticSent[row.id] ?? row.whatsappSentAt !== null;
+              return <QueueCard key={row.id} row={row} isSent={isSent} disabled={!canWrite || markSent.isPending} onChange={(sent) => markSent.mutate({ leadId: row.id, sent })} onUpdated={refreshWhatsapp} />;
+            })}
           </div>
           <div className="hidden md:block">
             <Table>
-              <TableHeader><TableRow><TableHead>Lead</TableHead><TableHead>Teléfono</TableHead><TableHead>Caller</TableHead><TableHead>Fecha</TableHead><TableHead className="w-24 text-center">Enviado</TableHead></TableRow></TableHeader>
-              <TableBody>{rows.map((row) => <TableRow key={row.id}><TableCell className="font-medium">{row.name}</TableCell><TableCell>{row.phone}</TableCell><TableCell>{row.caller?.name ?? "Sin caller"}</TableCell><TableCell>{new Date(row.queueDate!).toLocaleDateString("es-ES")}</TableCell><TableCell className="text-center"><Checkbox aria-label={`Marcar ${row.name} como enviado`} checked={optimisticSent[row.id] ?? row.whatsappSentAt !== null} disabled={!canMarkSent || markSent.isPending} onCheckedChange={(sent) => markSent.mutate({ leadId: row.id, sent })} /></TableCell></TableRow>)}</TableBody>
+              <TableHeader>
+                <TableRow><TableHead>Lead</TableHead><TableHead>Teléfono</TableHead><TableHead>Caller</TableHead><TableHead>Fecha</TableHead><TableHead>Preparación</TableHead><TableHead className="w-24 text-center">Enviado manual</TableHead></TableRow>
+              </TableHeader>
+              <TableBody>{rows.map((row) => <TableRow key={row.id}>
+                <TableCell className="font-medium">{row.name}</TableCell>
+                <TableCell>{row.phone}</TableCell>
+                <TableCell>{row.caller?.name ?? "Sin caller"}</TableCell>
+                <TableCell>{new Date(row.queueDate!).toLocaleDateString("es-ES")}</TableCell>
+                <TableCell><WhatsappMessagePreparation row={row} disabled={!canWrite} onUpdated={refreshWhatsapp} /></TableCell>
+                <TableCell className="text-center"><Checkbox aria-label={`Marcar ${row.name} como enviado manualmente`} checked={optimisticSent[row.id] ?? row.whatsappSentAt !== null} disabled={!canWrite || markSent.isPending} onCheckedChange={(sent) => markSent.mutate({ leadId: row.id, sent })} /></TableCell>
+              </TableRow>)}</TableBody>
             </Table>
           </div>
         </>;
@@ -107,10 +125,20 @@ export function WhatsappQueue() {
   return (
     <main className="flex w-full flex-col gap-4 p-4 md:p-6">
       <p className="sr-only" aria-live="polite">{confirmation}</p>
-      <header className="space-y-1">
+      <header className="flex flex-col gap-1">
         <div className="flex items-center gap-2"><div className="rounded-md bg-primary/10 p-2 text-primary"><CheckIcon className="size-4" /></div><h1 className="text-2xl font-semibold tracking-tight">WhatsApp</h1></div>
         <p className="text-sm text-muted-foreground">Leads con 3 impactos telefónicos sin contacto.</p>
       </header>
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-center gap-2"><CardTitle>Preparación segura</CardTitle><Badge variant="outline">Proveedor desactivado</Badge></div>
+          <CardDescription>
+            Puedes registrar consentimiento, preparar y aprobar borradores. No existe envío automático ni manual mediante proveedor en esta versión.
+            {deliveryCapability.data?.reason ? ` Estado técnico: ${deliveryCapability.data.reason}.` : ""}
+          </CardDescription>
+        </CardHeader>
+      </Card>
 
       <Card className="rounded-xl shadow-sm">
         <CardHeader className="pb-3"><CardTitle>Filtros</CardTitle><CardDescription>Selecciona únicamente el intervalo y el caller.</CardDescription></CardHeader>
@@ -133,16 +161,21 @@ export function WhatsappQueue() {
 }
 
 function QueueCard(props: {
-  row: {
-    id: string;
-    name: string;
-    phone: string;
+  row: WhatsappPreparationRow & {
     caller: { id: string | null; name: string | null } | null;
-    queueDate: string | null;
-    whatsappSentAt: string | null;
+    queueDate: string | Date | null;
+    whatsappSentAt: string | Date | null;
   };
+  isSent: boolean;
   disabled: boolean;
   onChange: (sent: boolean) => void;
+  onUpdated: () => Promise<void>;
 }) {
-  return <label className="flex min-h-16 items-center justify-between gap-3 rounded-lg border p-3"><span className="min-w-0"><span className="block truncate font-medium">{props.row.name}</span><span className="block text-xs text-muted-foreground">{props.row.phone}</span></span><Checkbox aria-label={`Marcar ${props.row.name} como enviado`} checked={props.row.whatsappSentAt !== null} disabled={props.disabled} onCheckedChange={props.onChange} /></label>;
+  return <div className="flex min-h-16 flex-col gap-3 rounded-lg border p-3">
+    <div className="flex items-start justify-between gap-3">
+      <span className="min-w-0"><span className="block truncate font-medium">{props.row.name}</span><span className="block text-xs text-muted-foreground">{props.row.phone}</span></span>
+      <label className="flex items-center gap-2 text-xs">Enviado manual<Checkbox aria-label={`Marcar ${props.row.name} como enviado manualmente`} checked={props.isSent} disabled={props.disabled} onCheckedChange={props.onChange} /></label>
+    </div>
+    <WhatsappMessagePreparation row={props.row} disabled={props.disabled} onUpdated={props.onUpdated} />
+  </div>;
 }
