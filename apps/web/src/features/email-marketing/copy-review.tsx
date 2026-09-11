@@ -5,6 +5,7 @@ export type EmailMarketingCopyReviewVersion = Readonly<{
   previewText: string | null;
   bodyText: string;
   status: "draft" | "approved" | "retired";
+  origin?: "manual" | "ai";
 }>;
 
 export function EmailMarketingCopyReview({ version }: { version: EmailMarketingCopyReviewVersion }) {
@@ -21,6 +22,7 @@ export function EmailMarketingCopyReview({ version }: { version: EmailMarketingC
       <p className="text-xs font-medium text-muted-foreground">Contenido exacto</p>
       <p className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/40 p-2 text-sm">{version.bodyText}</p>
     </div>
+    {version.origin === "ai" ? <p className="text-xs font-medium text-muted-foreground">Borrador creado con IA · requiere aprobación de otra persona</p> : null}
     <p className="text-xs text-muted-foreground">{version.status === "approved" ? "Aprobada" : version.status === "retired" ? "Sustituida" : "Pendiente de aprobación"}</p>
   </article>;
 }

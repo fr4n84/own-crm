@@ -1,10 +1,10 @@
 # Review the Email Marketing foundation before enabling delivery
 
-This slice creates an administrative preparation area for consent, suppression, immutable audience snapshots, and human-approved copy. It deliberately cannot send email, call a provider, track recipients, or run AI-generated copy. The database migration is generated but must be reviewed and applied through the normal deployment process.
+This slice creates an administrative preparation area for consent, suppression, privacy-minimized audience snapshots, local CSV export, and human-approved copy. It can ask OpenAI for a draft using aggregate approved context with `store: false`; the result is persisted only as a draft and AI-origin copy requires approval by a different person. It deliberately cannot send email, call a delivery provider, schedule delivery, or track recipients. Migration `0051_email_marketing_preparation.sql` is generated but must be reviewed and applied through the normal deployment process.
 
 ## Review path
 
-1. Review `packages/db/src/schema/email-marketing.ts` and migration `0047_email_marketing_foundation.sql`.
+1. Review `packages/db/src/schema/email-marketing.ts`, foundation migration `0047_email_marketing_foundation.sql`, and preparation/privacy migration `0051_email_marketing_preparation.sql`.
 2. Review the deterministic eligibility policy in `packages/api/src/email-marketing/domain.ts`.
 3. Review the admin-only API in `packages/api/src/routers/email-marketing.ts`.
 4. Confirm the `/email-marketing` screen exposes no send action and is hidden from non-admin roles.
@@ -37,16 +37,22 @@ This conservative default prevents accidental resubscription. A future unsubscri
 
 ## Immutable audience snapshots
 
-Each build creates a new snapshot with a monotonically increasing campaign version. Existing snapshots and members are never updated or deleted by the service. Migration `0047` also installs database triggers that reject ordinary `UPDATE` and `DELETE` operations on both tables.
+Each build creates a new snapshot with a monotonically increasing campaign version. Existing snapshots and members are never updated or deleted by the service. Migration `0047` installs the original immutable triggers. Migration `0051` removes frozen names and normalized emails, makes `lead_id` nullable for anonymization, removes legacy `selectedLeadId` evidence, and replaces the member trigger so the only permitted mutation is the narrow foreign-key-driven `lead_id` transition to null with an `anonymized` marker. Every other update or delete remains rejected.
 
-The only supported source is `all_unmerged_leads`; no SQL, expression, or executable audience query is stored. Every evaluated lead produces a member record with:
+The only supported source is `all_unmerged_leads`; no SQL, expression, or executable audience query is stored. Every evaluated lead produces a privacy-minimized member record with:
 
-- the frozen lead identifier, name, and normalized email available at build time;
+- the lead identifier while the lead exists, or null plus an `anonymized` marker after deletion; the snapshot stores no frozen name, email, or phone;
 - an `included` or `excluded` decision;
 - one stable reason: eligible, missing normalized email, no active consent, suppressed, or duplicate normalized email;
-- the exact permission/suppression identifiers, versions, sources, timestamps, selected duplicate owner, and policy version used for the decision.
+- the exact permission/suppression identifiers, versions, sources, timestamps, and policy version used for the decision, without duplicating contact PII.
 
 Inputs are sorted by lead ID. For duplicate normalized emails, the lexically first lead ID is the sole eligible member and all others are explicitly excluded. This makes the snapshot deterministic and prevents duplicate delivery if a future delivery layer uses it.
+
+## Local audience preview and export
+
+The admin preview resolves name, normalized email, phone, source, campaign, UTM, theme, and confirmed motivation data from the live lead. The immutable snapshot itself stores no direct contact PII. Name, email, and phone remain visible in the main table; the additional commercial context is available only behind the eye detail.
+
+Export is a local browser download with exactly `name,email,phone`. Immediately before generating the CSV, the service reloads the included lead records, current consent, and current suppression state, then deduplicates by the current normalized email. Formula-like spreadsheet cells are neutralized. The append-only export audit stores actor, purpose, timestamp, content hash, exported count, exclusion counts, snapshot, and operation ID; it never stores the CSV or contact PII. The globally unique operation ID is claimed with PostgreSQL `ON CONFLICT DO NOTHING`, so concurrent requests resolve the existing compatible audit instead of leaking a unique-constraint error.
 
 ## Copy approval flow
 
@@ -80,7 +86,7 @@ Control: no permission row means exclusion; only `granted` is eligible; active s
 
 ### Duplicate delivery
 
-Control: one included member per normalized email in each deterministic snapshot.
+Control: one included member per normalized email in each deterministic snapshot, followed by a second deduplication against the current normalized email during export so contacts that later converge cannot create duplicate CSV rows.
 
 ### Audience drift after review
 
@@ -104,7 +110,7 @@ Control: snapshots use a fixed source kind and store no query or expression.
 
 ### Premature delivery capability
 
-Control: this slice has no provider credentials, outbox, send procedure, webhook, tracking pixel, scheduling worker, or AI integration.
+Control: this slice has no delivery-provider credentials, outbox, send procedure, webhook, tracking pixel, or scheduling worker. Its OpenAI integration is restricted to `store: false` draft generation from aggregate context and cannot approve, export, or send.
 
 ## Future provider adapter boundary
 
@@ -187,9 +193,9 @@ Do not implement or activate delivery until the business has explicitly decided 
 - No unsubscribe endpoint exists yet.
 - No frequency or quiet-hour policy exists yet.
 - No open/click tracking exists.
-- No AI copy generation exists.
+- OpenAI can prepare a draft only; requests use `store: false`, drafts are persisted for review, and AI-origin copy requires approval by a different human.
 - The UI provides preparation and approval visibility, not a legal compliance determination.
-- Migration `0047_email_marketing_foundation.sql` is generated and intentionally not applied.
+- Migration `0051_email_marketing_preparation.sql` is generated after `0050` and intentionally not applied.
 
 ## Verification checklist
 

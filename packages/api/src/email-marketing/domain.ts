@@ -28,13 +28,11 @@ export type EmailAudienceCandidate = {
 export type EmailAudienceEvidence = Readonly<{
   permissionId?: string; permissionVersion?: number; permissionSource?: string; permissionOccurredAt?: string;
   suppressionId?: string; suppressionVersion?: number; suppressionSource?: string; suppressionOccurredAt?: string;
-  selectedLeadId?: string; policyVersion: string;
+  anonymized?: true; policyVersion: string;
 }>;
 
 export type EmailAudienceMember = Readonly<{
   leadId: string;
-  leadName: string;
-  normalizedEmail: string | null;
   decision: "included" | "excluded";
   reason: "eligible" | "missing_normalized_email" | "no_active_consent" | "suppressed" | "duplicate_normalized_email";
   evidence: EmailAudienceEvidence;
@@ -66,19 +64,15 @@ function member(
   candidate: EmailAudienceCandidate,
   decision: EmailAudienceMember["decision"],
   reason: EmailAudienceMember["reason"],
-  extra: Record<string, string | number> = {},
 ): EmailAudienceMember {
   return Object.freeze({
     leadId: candidate.leadId,
-    leadName: candidate.leadName,
-    normalizedEmail: candidate.normalizedEmail,
     decision,
     reason,
     evidence: Object.freeze({
       policyVersion: POLICY_VERSION,
       ...permissionEvidence(candidate.permission),
       ...suppressionEvidence(candidate.suppression),
-      ...extra,
     }) as EmailAudienceEvidence,
   });
 }
@@ -90,8 +84,7 @@ export function buildEmailAudienceSnapshot(candidates: readonly EmailAudienceCan
     if (!candidate.normalizedEmail) return member(candidate, "excluded", "missing_normalized_email");
     if (candidate.suppression?.active) return member(candidate, "excluded", "suppressed");
     if (candidate.permission?.status !== "granted") return member(candidate, "excluded", "no_active_consent");
-    const selectedLeadId = selectedLeadByEmail.get(candidate.normalizedEmail);
-    if (selectedLeadId) return member(candidate, "excluded", "duplicate_normalized_email", { selectedLeadId });
+    if (selectedLeadByEmail.has(candidate.normalizedEmail)) return member(candidate, "excluded", "duplicate_normalized_email");
     selectedLeadByEmail.set(candidate.normalizedEmail, candidate.leadId);
     return member(candidate, "included", "eligible");
   });

@@ -30,11 +30,13 @@ describe("email marketing admin boundary", () => {
       previewText: "Exact preview text",
       bodyText: "Exact body line one\nExact body line two",
       status: "draft",
+      origin: "ai",
     }} />);
 
     expect(html).toContain("v2");
     expect(html).toContain("Security review subject");
     expect(html).toContain("Exact preview text");
     expect(html).toContain("Exact body line one\nExact body line two");
+    expect(html).toContain("Borrador creado con IA");
   });
 });

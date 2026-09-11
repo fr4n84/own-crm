@@ -36,6 +36,28 @@ describe("email marketing audience policy", () => {
     expect(result.includedCount).toBe(0);
   });
 
+  it("does not duplicate names or emails in immutable audience members", () => {
+    const result = buildEmailAudienceSnapshot([
+      candidate({ permission: null }),
+      candidate({
+        leadId: "lead-2",
+        suppression: {
+          id: "suppression-1",
+          active: true,
+          reason: "unsubscribe",
+          source: "admin",
+          evidence: {},
+          occurredAt: new Date("2026-09-02T10:00:00.000Z"),
+          version: 1,
+        },
+      }),
+    ]);
+
+    for (const member of result.members) {
+      expect(member).not.toHaveProperty("leadName");
+      expect(member).not.toHaveProperty("normalizedEmail");
+    }
+  });
   it("lets suppression win even when consent is active", () => {
     const result = buildEmailAudienceSnapshot([
       candidate({
@@ -64,6 +86,7 @@ describe("email marketing audience policy", () => {
       expect.objectContaining({ leadId: "lead-2", decision: "excluded", reason: "duplicate_normalized_email" }),
       expect.objectContaining({ leadId: "lead-3", decision: "excluded", reason: "missing_normalized_email" }),
     ]);
+    expect(first.members[1]?.evidence).not.toHaveProperty("selectedLeadId");
     expect(Object.isFrozen(first.members)).toBe(true);
     expect(Object.isFrozen(first.members[0])).toBe(true);
   });

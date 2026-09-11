@@ -5,6 +5,7 @@ const service = vi.hoisted(() => ({
   listCampaigns: vi.fn(), permissionSummary: vi.fn(), recordConsent: vi.fn(), revokeConsent: vi.fn(),
   suppress: vi.fn(), liftSuppression: vi.fn(), createCampaign: vi.fn(), buildAudience: vi.fn(),
   addCopyVersion: vi.fn(), approveCopyVersion: vi.fn(), explainContact: vi.fn(),
+  listAudienceMembers: vi.fn(), exportAudience: vi.fn(), generateCopyDraft: vi.fn(),
 }));
 
 vi.mock("../email-marketing/service", () => ({ emailMarketingService: service }));
@@ -63,5 +64,54 @@ describe("email marketing router authorization", () => {
       occurredAt: new Date("2100-01-01T00:00:00.000Z"),
     })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(service.recordConsent).not.toHaveBeenCalled();
+  });
+  it("exports only through the audited local-download contract and forwards the real actor", async () => {
+    service.exportAudience.mockResolvedValue({
+      csv: "name,email,phone\r\n\"Ada\",\"ada@example.com\",\"+34600000001\"\r\n",
+      contentHash: "hash",
+      exportedCount: 1,
+      exclusions: { missing: 0, revoked: 0, suppressed: 0, duplicate: 0 },
+      idempotent: false,
+    });
+    const input = {
+      snapshotId: "00000000-0000-4000-8000-000000000001",
+      purpose: "Preparar audiencia para uso posterior",
+      operationId: "00000000-0000-4000-8000-000000000002",
+    };
+
+    await expect(emailMarketingRouter.createCaller(context(["leads:write"])).exportAudience(input))
+      .rejects.toMatchObject({ code: "FORBIDDEN" });
+    const result = await emailMarketingRouter.createCaller(context(["*"])).exportAudience(input);
+
+    expect(result.csv.split("\r\n")[0]).toBe("name,email,phone");
+    expect(service.exportAudience).toHaveBeenCalledWith({ ...input, actorId: "admin" });
+    expect(service).not.toHaveProperty("send");
+    expect(service).not.toHaveProperty("dispatch");
+  });
+
+  it("accepts bounded segmentation and AI draft preparation only for administrators", async () => {
+    service.buildAudience.mockResolvedValue({ id: "snapshot-1" });
+    service.generateCopyDraft.mockResolvedValue({ id: "copy-1", status: "draft", origin: "ai" });
+    const campaignId = "00000000-0000-4000-8000-000000000003";
+    const criteria = {
+      combine: "union" as const,
+      groups: [{ campaigns: ["Otoño"], confirmedFeedback: ["time_freedom" as const] }],
+    };
+
+    await emailMarketingRouter.createCaller(context(["*"])).buildAudience({ campaignId, criteria });
+    await emailMarketingRouter.createCaller(context(["*"])).generateCopyDraft({ campaignId });
+
+    expect(service.buildAudience).toHaveBeenCalledWith({ campaignId, criteria, actorId: "admin" });
+    expect(service.generateCopyDraft).toHaveBeenCalledWith({ campaignId, actorId: "admin" });
+  });
+  it("paginates audience preview with a bounded server input", async () => {
+    const snapshotId = "00000000-0000-4000-8000-000000000004";
+    service.listAudienceMembers.mockResolvedValue({ items: [], nextCursor: null });
+
+    await emailMarketingRouter.createCaller(context(["*"])).listAudienceMembers({ snapshotId });
+
+    expect(service.listAudienceMembers).toHaveBeenCalledWith({ snapshotId, limit: 25 });
+    await expect(emailMarketingRouter.createCaller(context(["*"])).listAudienceMembers({ snapshotId, limit: 101 }))
+      .rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 });

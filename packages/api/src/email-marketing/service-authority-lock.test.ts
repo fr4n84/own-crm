@@ -36,6 +36,7 @@ vi.mock("@crm-fran/db", () => ({
   eq: vi.fn(),
   inArray: vi.fn(),
   isNull: vi.fn(),
+  lt: vi.fn(),
 }));
 
 import { emailMarketingService } from "./service";

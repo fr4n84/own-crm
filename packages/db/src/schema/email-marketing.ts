@@ -7,6 +7,7 @@ import { leads } from "./leads";
 export const EMAIL_MARKETING_PERMISSION_STATUS = { GRANTED: "granted", REVOKED: "revoked" } as const;
 export const EMAIL_MARKETING_CAMPAIGN_STATUS = { DRAFT: "draft", READY: "ready" } as const;
 export const EMAIL_MARKETING_COPY_STATUS = { DRAFT: "draft", APPROVED: "approved", RETIRED: "retired" } as const;
+export const EMAIL_MARKETING_COPY_ORIGIN = { MANUAL: "manual", AI: "ai" } as const;
 export const EMAIL_MARKETING_AUDIENCE_DECISION = { INCLUDED: "included", EXCLUDED: "excluded" } as const;
 export const EMAIL_MARKETING_AUDIENCE_REASON = {
   ELIGIBLE: "eligible", MISSING_NORMALIZED_EMAIL: "missing_normalized_email", NO_ACTIVE_CONSENT: "no_active_consent",
@@ -14,10 +15,12 @@ export const EMAIL_MARKETING_AUDIENCE_REASON = {
 } as const;
 
 export type EmailMarketingEvidence = { reference?: string; note: string };
+export type EmailMarketingSegmentCriteria = { combine: "union" | "intersection" | "exclusion"; groups: Array<{ sources?: string[]; campaigns?: string[]; utmContents?: string[]; themes?: string[]; confirmedFeedback?: string[] }> };
+export type EmailMarketingExportExclusions = { missing: number; revoked: number; suppressed: number; duplicate: number };
 export type EmailMarketingAudienceEvidence = {
   permissionId?: string; permissionVersion?: number; permissionSource?: string; permissionOccurredAt?: string;
   suppressionId?: string; suppressionVersion?: number; suppressionSource?: string; suppressionOccurredAt?: string;
-  selectedLeadId?: string; policyVersion: string;
+  anonymized?: true; policyVersion: string;
 };
 
 export const emailMarketingPermissions = pgTable("email_marketing_permissions", {
@@ -79,6 +82,7 @@ export const emailMarketingCampaigns = pgTable("email_marketing_campaigns", {
 export const emailMarketingContentVersions = pgTable("email_marketing_content_versions", {
   id: text("id").primaryKey(), campaignId: text("campaign_id").notNull().references(() => emailMarketingCampaigns.id, { onDelete: "restrict" }), version: integer("version").notNull(),
   subject: text("subject").notNull(), previewText: text("preview_text"), bodyText: text("body_text").notNull(),
+  origin: text("origin").$type<"manual" | "ai">().default("manual").notNull(), contextHash: text("context_hash"),
   status: text("status").$type<(typeof EMAIL_MARKETING_COPY_STATUS)[keyof typeof EMAIL_MARKETING_COPY_STATUS]>().default(EMAIL_MARKETING_COPY_STATUS.DRAFT).notNull(),
   createdById: text("created_by_id").notNull().references(() => user.id, { onDelete: "restrict" }), approvedById: text("approved_by_id").references(() => user.id, { onDelete: "restrict" }),
   approvedAt: timestamp("approved_at", { withTimezone: true }), createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -86,6 +90,8 @@ export const emailMarketingContentVersions = pgTable("email_marketing_content_ve
   uniqueIndex("email_marketing_content_campaign_version_uidx").on(table.campaignId, table.version), uniqueIndex("email_marketing_content_one_approved_uidx").on(table.campaignId).where(sql`${table.status} = 'approved'`),
   index("email_marketing_content_campaign_idx").on(table.campaignId, table.createdAt), check("email_marketing_content_version_check", sql`${table.version} >= 1`),
   check("email_marketing_content_status_check", sql`${table.status} IN ('draft','approved','retired')`),
+  check("email_marketing_content_origin_check", sql`${table.origin} IN ('manual','ai')`),
+  check("email_marketing_content_ai_review_check", sql`${table.origin} <> 'ai' OR ${table.approvedById} IS NULL OR ${table.approvedById} <> ${table.createdById}`),
   check("email_marketing_content_approval_shape_check", sql`(${table.status} = 'draft' AND ${table.approvedById} IS NULL AND ${table.approvedAt} IS NULL) OR (${table.status} IN ('approved','retired') AND ${table.approvedById} IS NOT NULL AND ${table.approvedAt} IS NOT NULL)`),
   check("email_marketing_content_subject_check", sql`NULLIF(BTRIM(${table.subject}), '') IS NOT NULL`), check("email_marketing_content_body_check", sql`NULLIF(BTRIM(${table.bodyText}), '') IS NOT NULL`),
 ]);
@@ -93,6 +99,7 @@ export const emailMarketingContentVersions = pgTable("email_marketing_content_ve
 export const emailMarketingAudienceSnapshots = pgTable("email_marketing_audience_snapshots", {
   id: text("id").primaryKey(), campaignId: text("campaign_id").notNull().references(() => emailMarketingCampaigns.id, { onDelete: "restrict" }), version: integer("version").notNull(),
   sourceKind: text("source_kind").default("all_unmerged_leads").notNull(), policyVersion: text("policy_version").default("email-marketing-v1").notNull(),
+  criteria: json("criteria").$type<EmailMarketingSegmentCriteria>(),
   candidateCount: integer("candidate_count").notNull(), includedCount: integer("included_count").notNull(), createdById: text("created_by_id").notNull().references(() => user.id, { onDelete: "restrict" }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
@@ -102,17 +109,32 @@ export const emailMarketingAudienceSnapshots = pgTable("email_marketing_audience
 
 export const emailMarketingAudienceMembers = pgTable("email_marketing_audience_members", {
   id: text("id").primaryKey(), snapshotId: text("snapshot_id").notNull().references(() => emailMarketingAudienceSnapshots.id, { onDelete: "restrict" }),
-  leadId: text("lead_id").notNull().references(() => leads.id, { onDelete: "restrict" }), leadName: text("lead_name").notNull(), normalizedEmail: text("normalized_email"),
+  leadId: text("lead_id").references(() => leads.id, { onDelete: "set null" }),
   decision: text("decision").$type<(typeof EMAIL_MARKETING_AUDIENCE_DECISION)[keyof typeof EMAIL_MARKETING_AUDIENCE_DECISION]>().notNull(),
   reason: text("reason").$type<(typeof EMAIL_MARKETING_AUDIENCE_REASON)[keyof typeof EMAIL_MARKETING_AUDIENCE_REASON]>().notNull(),
   evidence: json("evidence").$type<EmailMarketingAudienceEvidence>().notNull(), createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
-  uniqueIndex("email_marketing_audience_member_snapshot_lead_uidx").on(table.snapshotId, table.leadId), index("email_marketing_audience_member_decision_idx").on(table.snapshotId, table.decision),
-  index("email_marketing_audience_member_email_idx").on(table.snapshotId, table.normalizedEmail), check("email_marketing_audience_decision_check", sql`${table.decision} IN ('included','excluded')`),
+  uniqueIndex("email_marketing_audience_member_snapshot_lead_uidx").on(table.snapshotId, table.leadId), index("email_marketing_audience_member_decision_idx").on(table.snapshotId, table.decision), check("email_marketing_audience_decision_check", sql`${table.decision} IN ('included','excluded')`),
   check("email_marketing_audience_reason_check", sql`${table.reason} IN ('eligible','missing_normalized_email','no_active_consent','suppressed','duplicate_normalized_email')`),
-  check("email_marketing_audience_member_shape_check", sql`(${table.decision} = 'included' AND ${table.reason} = 'eligible' AND ${table.normalizedEmail} IS NOT NULL) OR (${table.decision} = 'excluded' AND ${table.reason} <> 'eligible')`),
+  check("email_marketing_audience_member_shape_check", sql`(${table.decision} = 'included' AND ${table.reason} = 'eligible' AND (${table.leadId} IS NOT NULL OR ${table.evidence}->>'anonymized' = 'true')) OR (${table.decision} = 'excluded' AND ${table.reason} <> 'eligible')`),
 ]);
 
+export const emailMarketingExportAudits = pgTable("email_marketing_export_audits", {
+  id: text("id").primaryKey(),
+  snapshotId: text("snapshot_id").notNull().references(() => emailMarketingAudienceSnapshots.id, { onDelete: "restrict" }),
+  actorId: text("actor_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+  purpose: text("purpose").notNull(),
+  contentHash: text("content_hash").notNull(),
+  exportedCount: integer("exported_count").notNull(),
+  exclusions: json("exclusions").$type<EmailMarketingExportExclusions>().notNull(),
+  operationId: text("operation_id").notNull(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("email_marketing_export_operation_uidx").on(table.operationId),
+  index("email_marketing_export_snapshot_idx").on(table.snapshotId, table.occurredAt),
+  check("email_marketing_export_purpose_check", sql`char_length(btrim(${table.purpose})) BETWEEN 1 AND 500`),
+  check("email_marketing_export_count_check", sql`${table.exportedCount} >= 0`),
+]);
 export const emailMarketingCampaignRelations = relations(emailMarketingCampaigns, ({ many, one }) => ({
   creator: one(user, { fields: [emailMarketingCampaigns.createdById], references: [user.id] }), contentVersions: many(emailMarketingContentVersions), audienceSnapshots: many(emailMarketingAudienceSnapshots),
 }));
