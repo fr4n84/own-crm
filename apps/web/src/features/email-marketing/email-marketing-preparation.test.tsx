@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { fileURLToPath } from "node:url";
+import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
@@ -32,7 +32,13 @@ describe("email marketing preparation UI", () => {
   });
 
   it("uses four accessible tabs and a browser-only CSV download without any send action", () => {
-    const source = fs.readFileSync(fileURLToPath(new URL("./email-marketing-view.tsx", import.meta.url)), "utf8");
+    const sourcePath = path.resolve(
+      process.cwd(),
+      fs.existsSync(path.resolve(process.cwd(), "apps/web"))
+        ? "apps/web/src/features/email-marketing/email-marketing-view.tsx"
+        : "src/features/email-marketing/email-marketing-view.tsx",
+    );
+    const source = fs.readFileSync(sourcePath, "utf8");
 
     for (const token of [
       '<TabsList aria-label="Secciones de Email Marketing"',

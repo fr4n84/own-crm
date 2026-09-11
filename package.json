@@ -10,7 +10,7 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "check-types": "turbo check-types",
-    "test:unit": "vitest run --config vitest.safe.config.mjs",
+    "test:unit": "node scripts/run-safe-tests.mjs",
     "test:ui:roles": "pnpm --filter web exec vitest run src/features/users-access/users-access-view.test.tsx src/components/app-shell.test.tsx src/components/sign-up-form.test.tsx",
     "dev:web": "turbo -F web dev",
     "db:push": "turbo -F @crm-fran/db db:push",
