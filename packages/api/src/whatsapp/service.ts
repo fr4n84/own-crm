@@ -233,22 +233,31 @@ async function recordWhatsappConsent(input: WhatsappConsentInput, status: Whatsa
     });
 
     if (status === WHATSAPP_CONSENT_STATUS.REVOKED) {
-      const cancelled = await tx.update(whatsappOutboxMessages).set({
-        status: WHATSAPP_OUTBOX_STATUS.CANCELLED,
-        cancelledById: input.actorId,
-        cancelledAt: now,
-        updatedAt: now,
-      }).where(and(
-        eq(whatsappOutboxMessages.leadId, lead.id),
-        eq(whatsappOutboxMessages.status, WHATSAPP_OUTBOX_STATUS.PENDING_APPROVAL),
-      )).returning({ id: whatsappOutboxMessages.id });
+      const cancelled: Array<{ id: string; fromStatus: "pending_approval" | "approved" }> = [];
+      for (const fromStatus of [
+        WHATSAPP_OUTBOX_STATUS.PENDING_APPROVAL,
+        WHATSAPP_OUTBOX_STATUS.APPROVED,
+      ] as const) {
+        const cancelledForStatus = await tx.update(whatsappOutboxMessages).set({
+          status: WHATSAPP_OUTBOX_STATUS.CANCELLED,
+          approvedById: null,
+          approvedAt: null,
+          cancelledById: input.actorId,
+          cancelledAt: now,
+          updatedAt: now,
+        }).where(and(
+          eq(whatsappOutboxMessages.leadId, lead.id),
+          eq(whatsappOutboxMessages.status, fromStatus),
+        )).returning({ id: whatsappOutboxMessages.id });
+        cancelled.push(...cancelledForStatus.map((message) => ({ ...message, fromStatus })));
+      }
       if (cancelled.length > 0) {
         await tx.insert(whatsappOutboxEvents).values(cancelled.map((message) => ({
           id: crypto.randomUUID(),
           messageId: message.id,
           action: "cancelled" as const,
           actorId: input.actorId,
-          snapshot: { fromStatus: "pending_approval", toStatus: "cancelled", reason: "consent_revoked" },
+          snapshot: { fromStatus: message.fromStatus, toStatus: "cancelled", reason: "consent_revoked" },
           occurredAt: now,
         })));
       }
@@ -372,6 +381,12 @@ export async function submitWhatsappForApproval(input: SubmitWhatsappForApproval
 
 export async function approveWhatsappMessage(input: { messageId: string; actorId: string }) {
   return db.transaction(async (tx) => {
+    const [candidate] = await tx.select().from(whatsappOutboxMessages)
+      .where(eq(whatsappOutboxMessages.id, input.messageId)).limit(1);
+    if (!candidate) throw new WhatsappNotFoundError("WhatsApp outbox message was not found");
+
+    const [consent] = await tx.select().from(whatsappConsents)
+      .where(eq(whatsappConsents.id, candidate.consentId)).for("update").limit(1);
     const [message] = await tx.select().from(whatsappOutboxMessages)
       .where(eq(whatsappOutboxMessages.id, input.messageId)).for("update").limit(1);
     if (!message) throw new WhatsappNotFoundError("WhatsApp outbox message was not found");
@@ -386,14 +401,13 @@ export async function approveWhatsappMessage(input: { messageId: string; actorId
       .where(eq(leads.id, message.leadId)).limit(1);
     if (!lead) throw new WhatsappNotFoundError("Lead was not found");
     const normalizedPhone = currentNormalizedPhone(lead.phone);
-    const [consent] = await tx.select().from(whatsappConsents).where(and(
-      eq(whatsappConsents.id, message.consentId),
-      eq(whatsappConsents.leadId, lead.id),
-      eq(whatsappConsents.normalizedPhone, normalizedPhone),
-      eq(whatsappConsents.status, WHATSAPP_CONSENT_STATUS.GRANTED),
-      eq(whatsappConsents.version, message.consentVersion),
-    )).limit(1);
-    if (!consent || !hasCurrentWhatsappConsent({ leadId: lead.id, normalizedPhone, consent })) {
+    if (
+      !consent
+      || message.consentId !== consent.id
+      || message.consentVersion !== consent.version
+      || message.normalizedRecipient !== normalizedPhone
+      || !hasCurrentWhatsappConsent({ leadId: lead.id, normalizedPhone, consent })
+    ) {
       throw new WhatsappConflictError("WhatsApp consent or the current phone changed; prepare a new message");
     }
     const now = new Date();

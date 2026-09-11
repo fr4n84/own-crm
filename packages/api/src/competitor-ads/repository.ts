@@ -114,8 +114,8 @@ export const competitorAdRepository: CompetitorAdSyncRepository & {
             currentHash: hash,
             firstSeenAt: input.retrievedAt,
             lastSeenAt: input.retrievedAt,
-            isActive: true,
-            inactiveObservedAt: null,
+            isActive,
+            inactiveObservedAt: isActive ? null : input.retrievedAt,
             createdAt: input.retrievedAt,
             updatedAt: input.retrievedAt,
           }).onConflictDoNothing();
@@ -123,8 +123,8 @@ export const competitorAdRepository: CompetitorAdSyncRepository & {
           await tx.update(competitorAds).set({
             currentHash: hash,
             lastSeenAt: input.retrievedAt,
-            isActive: true,
-            inactiveObservedAt: null,
+            isActive,
+            inactiveObservedAt: isActive ? null : input.retrievedAt,
             updatedAt: input.retrievedAt,
           }).where(eq(competitorAds.id, current.id));
         }
