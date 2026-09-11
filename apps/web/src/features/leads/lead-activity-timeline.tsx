@@ -44,6 +44,9 @@ const ICON_BY_KIND: Record<ActivityKind, typeof HistoryIcon> = {
   recommendation_opened: EyeIcon,
   recommendation_completed: CheckCircle2Icon,
   recommendation_skipped: CircleOffIcon,
+  collection_reviewed: EyeIcon,
+  collection_contact_recorded: CircleUserRoundIcon,
+  collection_next_action_scheduled: CalendarClockIcon,
 };
 
 function formatActivityDate(value: Date | string | null) {

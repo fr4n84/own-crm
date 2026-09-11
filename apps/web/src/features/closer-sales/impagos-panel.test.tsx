@@ -51,7 +51,7 @@ const report = {
       pendingCents: 20_000,
       closer: { id: "closer-1", name: "Grace Hopper" },
       lastCollectionContact: {
-        occurredAt: new Date("2026-09-09T09:00:00.000Z"),
+        occurredAt: "2026-09-09T09:00:00.000Z",
         note: "<img src=x onerror=alert(1)>",
       },
       nextAction: { scheduledFor: "2026-09-12", note: "Llamar de nuevo" },
