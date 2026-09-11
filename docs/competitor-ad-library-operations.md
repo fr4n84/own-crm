@@ -2,7 +2,7 @@
 
 ## Current safety posture
 
-The ingestion foundation is **disabled by default**. It does not send requests to Meta unless every activation requirement below is satisfied. This work unit adds no scheduler and no dashboard.
+The ingestion foundation is **disabled by default**. It does not send requests to Meta unless every activation requirement below is satisfied. This work unit adds no scheduler. The read-only intelligence dashboard lives at Observatorio comercial > Biblioteca publicitaria > Competencia (/observatorio-comercial/biblioteca-publicitaria).
 
 The service persists only allowlisted public ad fields: Meta library ad ID, Page ID/name, delivery dates, publisher platforms, public creative text, snapshot URL, and the documented reach/impressions/spend representations. Provider payload fields outside that allowlist are discarded.
 
@@ -13,6 +13,12 @@ Metrics retain their source semantics:
 - Missing metrics are stored as `unavailable`, never zero.
 - `ai_inferred` is reserved as a distinct future classification. This work unit does not produce AI inference.
 
+
+## Observatory interface
+
+Authorized Observatory users can read the latest competitor observations and the sanitized daily synchronization history. Only Admin can add or edit a competitor Page ID, display name, country list, or enabled state. Provider tokens, the sync secret, raw provider errors, and provider payloads are never returned to this view.
+
+The interface labels reach as estimated, impressions/spend as ranges, and missing values as unavailable. It does not sum incomparable metrics or generate AI inferences. There is deliberately no manual synchronization action: daily execution remains scheduler-driven through the internal authenticated endpoint.
 ## Activation blockers
 
 Do not enable the runtime until all of these are complete:
@@ -54,4 +60,4 @@ Pagination follows only the validated opaque `paging.cursors.after` value. The i
 
 Migration `0053` is generated but intentionally not applied by this work unit.
 
-Rollback before activation: revert the schema, migration, API module, router registration, internal route, and environment declarations together. After activation, preserve or export the append-only snapshots and sync-run audit data before dropping tables. Removing the dashboard is not relevant because this work unit does not add one.
+Rollback before activation: revert the schema, migration, API module, router registration, internal route, and environment declarations together. After activation, preserve or export the append-only snapshots and sync-run audit data before dropping tables. The dashboard can be rolled back independently by reverting its page, view, panel, read-only overview query, and documentation. This does not alter ingestion or persisted snapshots.

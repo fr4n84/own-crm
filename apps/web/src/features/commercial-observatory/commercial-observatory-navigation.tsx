@@ -21,7 +21,7 @@ const OBSERVATORY_TABS = [
   { value: "intelligence", label: "Inteligencia", route: "/observatorio-comercial/inteligencia", permission: "leads:read", icon: BrainCircuitIcon },
   { value: "evidence", label: "Evidencia", route: "/observatorio-comercial/evidencia-comercial", permission: "leads:read", icon: FileChartColumnIcon },
   { value: "feedback", label: "Feedback", route: "/observatorio-comercial/feedback", permission: "leads:read", icon: MessagesSquareIcon },
-  { value: "marketing-library", label: "Biblioteca publicitaria", route: "/observatorio-comercial/biblioteca-publicitaria", permission: "*", icon: MegaphoneIcon },
+  { value: "marketing-library", label: "Biblioteca publicitaria", route: "/observatorio-comercial/biblioteca-publicitaria", permission: "leads:read", icon: MegaphoneIcon },
   { value: "planning", label: "Planificación", route: "/observatorio-comercial/planificacion", permission: "*", icon: CalculatorIcon },
 ] as const satisfies readonly {
   value: string;
