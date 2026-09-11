@@ -38,6 +38,7 @@ const apiTests = [
   "src/commercial-observatory/access.test.ts",
   "src/commercial-observatory/metric-explanations.test.ts",
   "src/competitor-ads/meta-client.test.ts",
+  "src/competitor-ads/repository.test.ts",
   "src/competitor-ads/sync-service.test.ts",
   "src/dashboard/access.test.ts",
   "src/dashboard/conversion-funnel-range.test.ts",
@@ -85,6 +86,7 @@ const apiTests = [
   "src/whatsapp/delivery-provider.test.ts",
   "src/whatsapp/domain.test.ts",
   "src/whatsapp/draft.test.ts",
+  "src/whatsapp/service-authority-lock.test.ts",
 ];
 
 const dbTests = [
