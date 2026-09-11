@@ -20,6 +20,7 @@ import { askCrmRouter } from "./ask-crm";
 import { marketingAttributionRouter } from "./marketing-attribution";
 import { closerSalesRouter } from "./closer-sales";
 import { whatsappRouter } from "./whatsapp";
+import { competitorAdsRouter } from "./competitor-ads";
 import { commercialCoachingRouter } from "./commercial-coaching";
 import { suggestionsRouter } from "./suggestions";
 import { emailMarketingRouter } from "./email-marketing";
@@ -68,6 +69,7 @@ export const appRouter = router({
   marketingAttribution: marketingAttributionRouter,
   closerSales: closerSalesRouter,
   whatsapp: whatsappRouter,
+  competitorAds: competitorAdsRouter,
   commercialCoaching: commercialCoachingRouter,
   suggestions: suggestionsRouter,
   emailMarketing: emailMarketingRouter,

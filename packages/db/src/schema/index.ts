@@ -29,3 +29,4 @@ export * from "./admin-exports";
 export * from "./email-marketing";
 export * from "./team-presence";
 export * from "./whatsapp";
+export * from "./competitor-ads";
