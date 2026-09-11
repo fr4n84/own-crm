@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 import { router } from "../index";
 import { permittedProcedure } from "../trpc/trpc";
 import { competitorAdRepository } from "../competitor-ads/repository";
+import { assertObservatoryAccess } from "../commercial-observatory/access";
 
 function requireAdmin(permissions: readonly string[]) {
   if (!permissions.includes("*")) {
@@ -21,6 +22,13 @@ const sourceInput = z.object({
 });
 
 export const competitorAdsRouter = router({
+  overview: permittedProcedure(["leads:read"]).input(z.object({
+    adLimit: z.number().int().min(1).max(100).default(50),
+    runLimit: z.number().int().min(1).max(50).default(20),
+  }).optional()).query(async ({ ctx, input }) => {
+    await assertObservatoryAccess(ctx.role?.id, ctx.permissions);
+    return competitorAdRepository.getOverview(input?.adLimit ?? 50, input?.runLimit ?? 20);
+  }),
   listSources: permittedProcedure(["users:read"]).query(({ ctx }) => {
     requireAdmin(ctx.permissions);
     return competitorAdRepository.listSources();

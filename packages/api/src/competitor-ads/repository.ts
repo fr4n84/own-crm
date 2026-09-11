@@ -2,9 +2,51 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { and, db, desc, eq } from "@crm-fran/db";
 import { competitorAdSnapshots, competitorAdSources, competitorAdSyncRuns, competitorAds } from "@crm-fran/db/schema/index";
+import type { CompetitorAdMetric, CompetitorAdProvenance, CompetitorAdPublicFields } from "@crm-fran/db/schema/competitor-ads";
 
 import type { CompetitorAd, CompetitorAdCoverage, CompetitorAdSyncRepository, CompetitorAdSyncRun } from "./sync-service";
 
+
+export type CompetitorAdIntelligenceOverview = {
+  sources: Array<{
+    id: string;
+    metaPageId: string;
+    displayName: string;
+    countries: string[];
+    enabled: boolean;
+    updatedAt: Date;
+  }>;
+  ads: Array<{
+    id: string;
+    sourceId: string;
+    sourceName: string;
+    providerAdId: string;
+    isActive: boolean;
+    observation: "new" | "changed" | "inactive";
+    firstSeenAt: Date;
+    lastSeenAt: Date;
+    inactiveObservedAt: Date | null;
+    observationStatus: "active" | "inactive";
+    publicFields: CompetitorAdPublicFields;
+    metrics: CompetitorAdMetric[];
+    provenance: CompetitorAdProvenance;
+    retrievedAt: Date;
+    coverageComplete: boolean;
+  }>;
+  runs: Array<{
+    id: string;
+    status: "succeeded" | "partial" | "failed";
+    startedAt: Date;
+    completedAt: Date;
+    competitorCount: number;
+    adsSeen: number;
+    snapshotsInserted: number;
+    snapshotsUnchanged: number;
+    adsMarkedInactive: number;
+    coverageComplete: boolean;
+    requiresAttention: boolean;
+  }>;
+};
 function contentHash(status: "active" | "inactive", publicFields: object, metrics: object, provenance: object) {
   return createHash("sha256").update(JSON.stringify({ status, publicFields, metrics, provenance }), "utf8").digest("hex");
 }
@@ -25,6 +67,7 @@ export const competitorAdRepository: CompetitorAdSyncRepository & {
   upsertSource(input: { id?: string; metaPageId: string; displayName: string; countries: string[]; enabled: boolean; actorId: string; now: Date }): Promise<typeof competitorAdSources.$inferSelect>;
   setSourceEnabled(input: { id: string; enabled: boolean; now: Date }): Promise<boolean>;
   listRecentRuns(limit: number): Promise<Array<typeof competitorAdSyncRuns.$inferSelect>>;
+  getOverview(adLimit: number, runLimit: number): Promise<CompetitorAdIntelligenceOverview>;
 } = {
   async findRunByOperationKey(operationKey) {
     const [run] = await db.select().from(competitorAdSyncRuns).where(eq(competitorAdSyncRuns.operationKey, operationKey)).limit(1);
@@ -155,6 +198,84 @@ export const competitorAdRepository: CompetitorAdSyncRepository & {
     return existing;
   },
 
+  async getOverview(adLimit, runLimit) {
+    const [sources, adRows, runs] = await Promise.all([
+      this.listSources(),
+      db.select({
+        id: competitorAds.id,
+        sourceId: competitorAds.sourceId,
+        sourceName: competitorAdSources.displayName,
+        providerAdId: competitorAds.providerAdId,
+        isActive: competitorAds.isActive,
+        firstSeenAt: competitorAds.firstSeenAt,
+        lastSeenAt: competitorAds.lastSeenAt,
+        inactiveObservedAt: competitorAds.inactiveObservedAt,
+      })
+        .from(competitorAds)
+        .innerJoin(competitorAdSources, eq(competitorAds.sourceId, competitorAdSources.id))
+        .orderBy(desc(competitorAds.lastSeenAt))
+        .limit(adLimit),
+      this.listRecentRuns(runLimit),
+    ]);
+
+    const adsWithLatestSnapshot = await Promise.all(adRows.map(async (ad) => {
+      const snapshots = await db.select({
+        observationStatus: competitorAdSnapshots.observationStatus,
+        publicFields: competitorAdSnapshots.publicFields,
+        metrics: competitorAdSnapshots.metrics,
+        provenance: competitorAdSnapshots.provenance,
+        retrievedAt: competitorAdSnapshots.retrievedAt,
+        coverage: competitorAdSnapshots.coverage,
+      })
+        .from(competitorAdSnapshots)
+        .where(eq(competitorAdSnapshots.adId, ad.id))
+        .orderBy(desc(competitorAdSnapshots.retrievedAt), desc(competitorAdSnapshots.createdAt))
+        .limit(2);
+      const latest = snapshots[0];
+      if (!latest) return null;
+      return {
+        ...ad,
+        observation: (!ad.isActive || latest.observationStatus === "inactive"
+          ? "inactive"
+          : snapshots.length === 1
+            ? "new"
+            : "changed") as "new" | "changed" | "inactive",
+        observationStatus: latest.observationStatus,
+        publicFields: latest.publicFields,
+        metrics: latest.metrics,
+        provenance: latest.provenance,
+        retrievedAt: latest.retrievedAt,
+        coverageComplete: latest.coverage.complete,
+      };
+    }));
+
+    return {
+      sources: sources.map((source) => ({
+        id: source.id,
+        metaPageId: source.metaPageId,
+        displayName: source.displayName,
+        countries: source.countries,
+        enabled: source.enabled,
+        updatedAt: source.updatedAt,
+      })),
+      ads: adsWithLatestSnapshot.filter(
+        (ad): ad is NonNullable<typeof ad> => ad !== null,
+      ),
+      runs: runs.map((run) => ({
+        id: run.id,
+        status: run.status,
+        startedAt: run.startedAt,
+        completedAt: run.completedAt,
+        competitorCount: run.competitorCount,
+        adsSeen: run.adsSeen,
+        snapshotsInserted: run.snapshotsInserted,
+        snapshotsUnchanged: run.snapshotsUnchanged,
+        adsMarkedInactive: run.adsMarkedInactive,
+        coverageComplete: run.coverage.every((item) => item.complete),
+        requiresAttention: run.status !== "succeeded",
+      })),
+    };
+  },
   async listSources() {
     return db.select().from(competitorAdSources).orderBy(competitorAdSources.displayName);
   },
